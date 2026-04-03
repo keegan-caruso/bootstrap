@@ -1,0 +1,12 @@
+command = /bin/zsh
+font-family = JetBrainsMono Nerd Font
+theme = GitHub Light Default
+background = #ffffff
+foreground = #1f2328
+window-padding-x = 10
+window-padding-y = 10
+cursor-style = block
+shell-integration = zsh
+copy-on-select = clipboard
+confirm-close-surface = false
+macos-titlebar-style = tabs

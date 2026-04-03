@@ -1,0 +1,69 @@
+add_newline = false
+
+format = """
+$directory$git_branch$git_status$fill$nodejs$python$golang$rust$package$cmd_duration$line_break$character
+"""
+
+palette = "github_light"
+
+[palettes.github_light]
+text = "#24292f"
+muted = "#57606a"
+blue = "#0969da"
+green = "#1a7f37"
+yellow = "#9a6700"
+red = "#cf222e"
+purple = "#8250df"
+
+[directory]
+style = "bold blue"
+read_only = "  ro"
+read_only_style = "red"
+truncate_to_repo = false
+
+[git_branch]
+symbol = "git "
+style = "purple"
+format = " [$symbol$branch]($style)"
+
+[git_status]
+style = "yellow"
+format = "([ $all_status$ahead_behind]($style))"
+
+[fill]
+symbol = " "
+
+[nodejs]
+symbol = "node "
+style = "green"
+format = " [$symbol$version]($style)"
+
+[python]
+symbol = "py "
+style = "green"
+format = " [$symbol$version]($style)"
+
+[golang]
+symbol = "go "
+style = "blue"
+format = " [$symbol$version]($style)"
+
+[rust]
+symbol = "rs "
+style = "red"
+format = " [$symbol$version]($style)"
+
+[package]
+symbol = "pkg "
+style = "muted"
+format = " [$symbol$version]($style)"
+
+[cmd_duration]
+min_time = 500
+style = "muted"
+format = " [$duration]($style)"
+
+[character]
+success_symbol = "[>](bold green)"
+error_symbol = "[>](bold red)"
+vimcmd_symbol = "[<](bold blue)"
