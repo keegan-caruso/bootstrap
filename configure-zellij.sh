@@ -47,41 +47,44 @@ upsert_block() {
   local tmp
 
   ensure_file "$file"
-  tmp="$(mktemp)"
+  tmp="$(mktemp)" || fail "Failed to create temporary file"
 
-  awk -v start="$start" -v end="$end" -v block="$content" '
-    BEGIN {
-      in_block = 0
-      replaced = 0
-    }
-    $0 == start {
-      print start
-      print block
-      print end
-      in_block = 1
-      replaced = 1
-      next
-    }
-    $0 == end {
-      in_block = 0
-      next
-    }
-    !in_block {
-      print
-    }
-    END {
-      if (!replaced) {
-        if (NR > 0) {
-          print ""
-        }
+  (
+    flock -x 9 || fail "Failed to acquire lock on ${file}"
+    awk -v start="$start" -v end="$end" -v block="$content" '
+      BEGIN {
+        in_block = 0
+        replaced = 0
+      }
+      $0 == start {
         print start
         print block
         print end
+        in_block = 1
+        replaced = 1
+        next
       }
-    }
-  ' "$file" >"$tmp"
+      $0 == end {
+        in_block = 0
+        next
+      }
+      !in_block {
+        print
+      }
+      END {
+        if (!replaced) {
+          if (NR > 0) {
+            print ""
+          }
+          print start
+          print block
+          print end
+        }
+      }
+    ' "$file" >"$tmp"
 
-  mv "$tmp" "$file"
+    mv "$tmp" "$file"
+  ) 9>"${file}.lock"
 }
 
 require_zellij() {
@@ -559,20 +562,34 @@ write_layout() {
 
   cat >"$layout_file" <<'EOF'
 layout {
-    pane size=1 borderless=true {
-        plugin location="tab-bar"
-    }
-    pane split_direction="vertical" {
-        pane name="editor"
-        pane split_direction="horizontal" size="30%" {
-            pane name="terminal"
-            pane name="git-status" command="git" {
-                args "status"
-            }
+    default_tab_template {
+        pane size=1 borderless=true {
+            plugin location="tab-bar"
+        }
+        children
+        pane size=1 borderless=true {
+            plugin location="status-bar"
         }
     }
-    pane size=1 borderless=true {
-        plugin location="status-bar"
+
+    // Primary coding workspace
+    tab name="Code" focus=true {
+        pane split_direction="vertical" {
+            pane name="copilot" size="65%" focus=true command="gh" {
+                args "copilot"
+            }
+            pane name="shell" size="35%"
+        }
+    }
+
+    // Focused Copilot interaction tab
+    tab name="Copilot Chat" {
+        pane split_direction="horizontal" {
+            // Full-width pane for extended `gh copilot` sessions
+            pane name="chat" size="65%" focus=true
+            // Reference terminal for looking up code/docs while chatting
+            pane name="reference" size="35%"
+        }
     }
 }
 EOF

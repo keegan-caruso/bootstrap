@@ -78,22 +78,6 @@ function Get-WslArgs {
     return $args
 }
 
-function Format-NativeArgument {
-    param(
-        [Parameter(Mandatory = $true)]
-        [string]$Argument
-    )
-
-    if ($Argument -notmatch '[\s"]') {
-        return $Argument
-    }
-
-    $escaped = $Argument -replace '(\\*)"', '$1$1\"'
-    $escaped = $escaped -replace '(\\+)$', '$1$1'
-
-    return '"' + $escaped + '"'
-}
-
 $wtExe = Resolve-WtPath -OverridePath $WtPath
 $wslArgs = Get-WslArgs -TargetDistro $Distro -TargetDirectory $WorkingDirectory -TargetShell $Shell
 
@@ -111,6 +95,4 @@ Write-Host "Distro: $(if ($Distro) { $Distro } else { 'default' })"
 Write-Host "Shell: $Shell"
 Write-Host "Working directory: $WorkingDirectory"
 
-$quotedArgs = ($terminalArgs | ForEach-Object { Format-NativeArgument $_ }) -join ' '
-
-Start-Process -FilePath $wtExe -ArgumentList $quotedArgs
+& $wtExe @terminalArgs

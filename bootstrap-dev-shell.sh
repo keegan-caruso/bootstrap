@@ -84,6 +84,60 @@ warn_if_slow_wsl_worktree() {
   fi
 }
 
+ensure_wsl_interop() {
+  if [[ "$IS_WSL" -eq 0 ]]; then
+    return
+  fi
+
+  local wsl_conf="/etc/wsl.conf"
+
+  if [[ -f /proc/sys/fs/binfmt_misc/WSLInterop ]]; then
+    log "WSL interop (Windows exe support) is enabled"
+    return
+  fi
+
+  log "WSL interop is not active; enabling in ${wsl_conf}"
+
+  if [[ ! -f "$wsl_conf" ]] || ! grep -q '^\[interop\]' "$wsl_conf"; then
+    printf '\n[interop]\nenabled = true\nappendWindowsPath = true\n' | sudo tee -a "$wsl_conf" >/dev/null
+  else
+    sudo sed -i '/^\[interop\]/,/^\[/{s/^enabled\s*=.*/enabled = true/}' "$wsl_conf"
+    if ! grep -A5 '^\[interop\]' "$wsl_conf" | grep -q '^appendWindowsPath'; then
+      sudo sed -i '/^\[interop\]/a appendWindowsPath = true' "$wsl_conf"
+    fi
+  fi
+
+  log "Restart WSL (wsl --shutdown) to apply interop changes"
+}
+
+find_windows_credential_manager() {
+  local paths=(
+    "/mnt/c/Program Files/Git/mingw64/bin/git-credential-manager.exe"
+    "/mnt/c/Program Files/Git/mingw64/libexec/git-core/git-credential-manager.exe"
+    "/mnt/c/Program Files (x86)/Git/mingw64/bin/git-credential-manager.exe"
+    "/mnt/c/Program Files/Git/mingw64/libexec/git-core/git-credential-manager-core.exe"
+  )
+
+  for p in "${paths[@]}"; do
+    if [[ -x "$p" ]]; then
+      printf '%s\n' "$p"
+      return
+    fi
+  done
+
+  if command_exists git-credential-manager.exe; then
+    command -v git-credential-manager.exe
+    return
+  fi
+
+  if command_exists git-credential-manager-core.exe; then
+    command -v git-credential-manager-core.exe
+    return
+  fi
+
+  return 1
+}
+
 detect_os() {
   case "$(uname -s)" in
     Darwin)
@@ -135,41 +189,44 @@ upsert_block() {
   local tmp
 
   ensure_file "$file"
-  tmp="$(mktemp)"
+  tmp="$(mktemp)" || fail "Failed to create temporary file"
 
-  awk -v start="$start" -v end="$end" -v block="$content" '
-    BEGIN {
-      in_block = 0
-      replaced = 0
-    }
-    $0 == start {
-      print start
-      print block
-      print end
-      in_block = 1
-      replaced = 1
-      next
-    }
-    $0 == end {
-      in_block = 0
-      next
-    }
-    !in_block {
-      print
-    }
-    END {
-      if (!replaced) {
-        if (NR > 0) {
-          print ""
-        }
+  (
+    flock -x 9 || fail "Failed to acquire lock on ${file}"
+    awk -v start="$start" -v end="$end" -v block="$content" '
+      BEGIN {
+        in_block = 0
+        replaced = 0
+      }
+      $0 == start {
         print start
         print block
         print end
+        in_block = 1
+        replaced = 1
+        next
       }
-    }
-  ' "$file" >"$tmp"
+      $0 == end {
+        in_block = 0
+        next
+      }
+      !in_block {
+        print
+      }
+      END {
+        if (!replaced) {
+          if (NR > 0) {
+            print ""
+          }
+          print start
+          print block
+          print end
+        }
+      }
+    ' "$file" >"$tmp"
 
-  mv "$tmp" "$file"
+    mv "$tmp" "$file"
+  ) 9>"${file}.lock"
 }
 
 append_unique_line() {
@@ -429,27 +486,6 @@ install_doom_emacs() {
   YES=1 "${emacs_dir}/bin/doom" install --force
 }
 
-set_default_zsh() {
-  local zsh_path
-
-  zsh_path="$(command -v zsh)"
-  if [[ -z "$zsh_path" ]]; then
-    fail "zsh was not found after installation."
-  fi
-
-  if [[ "$OS" == "ubuntu" ]]; then
-    if ! grep -Fxq "$zsh_path" /etc/shells; then
-      printf '%s\n' "$zsh_path" | sudo tee -a /etc/shells >/dev/null
-    fi
-    if [[ "$IS_WSL" -eq 1 ]]; then
-      log "Skipping login shell change under WSL"
-    elif [[ "${SHELL:-}" != "$zsh_path" ]]; then
-      log "Setting zsh as the default shell for ${USER}"
-      chsh -s "$zsh_path"
-    fi
-  fi
-}
-
 prompt_for_git_email() {
   local input
 
@@ -529,10 +565,12 @@ configure_git() {
   if [[ "$IS_WSL" -eq 1 ]]; then
     git config --global core.fileMode false
     git config --global core.autocrlf input
-    if command_exists git-credential-manager; then
-      git config --global credential.helper manager-core
-    elif command_exists git-credential-manager-core; then
-      git config --global credential.helper manager-core
+    local gcm_path
+    if gcm_path="$(find_windows_credential_manager)"; then
+      git config --global credential.helper "${gcm_path}"
+      log "Git credential helper set to Windows GCM: ${gcm_path}"
+    else
+      log "Windows Git Credential Manager not found; skipping credential.helper"
     fi
   fi
 }
@@ -541,6 +579,10 @@ main() {
   detect_os
   warn_if_slow_wsl_worktree
   require_sudo
+
+  if [[ "$IS_WSL" -eq 1 ]]; then
+    ensure_wsl_interop
+  fi
 
   if [[ "$OS" == "ubuntu" ]]; then
     install_ubuntu_base
@@ -553,7 +595,6 @@ main() {
   install_csharpier_if_dotnet_available
   install_vscode
   install_doom_emacs
-  set_default_zsh
   prompt_for_git_email
   write_zshrc_blocks
   if [[ "$IS_WSL" -eq 1 ]]; then
