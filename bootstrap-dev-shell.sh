@@ -268,7 +268,7 @@ setup_brew_env() {
   fi
 
   eval "$("${BREW_PREFIX}/bin/brew" shellenv)"
-  append_unique_line "${HOME}/.zprofile" "eval \"\$(${BREW_PREFIX}/bin/brew shellenv)\""
+  append_unique_line "${HOME}/.zprofile" "eval \"\$(\"${BREW_PREFIX}/bin/brew\" shellenv)\""
 }
 
 install_symbola_font() {
@@ -443,7 +443,7 @@ write_doom_config() {
   fi
 
   while IFS= read -r source_file; do
-    relative_path="${source_file#${source_dir}/}"
+    relative_path="${source_file#"${source_dir}"/}"
     mkdir -p "$(dirname "${doom_config_dir}/${relative_path}")"
     install -m 0644 "${source_file}" "${doom_config_dir}/${relative_path}"
   done < <(find "${source_dir}" -type f)
@@ -567,7 +567,9 @@ configure_git() {
     git config --global core.autocrlf input
     local gcm_path
     if gcm_path="$(find_windows_credential_manager)"; then
-      git config --global credential.helper "${gcm_path}"
+      # Git parses credential.helper as a shell-split command, so paths
+      # containing spaces (e.g. "Program Files") must be quoted in the value.
+      git config --global credential.helper "\"${gcm_path}\""
       log "Git credential helper set to Windows GCM: ${gcm_path}"
     else
       log "Windows Git Credential Manager not found; skipping credential.helper"

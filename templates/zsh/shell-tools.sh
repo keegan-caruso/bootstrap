@@ -1,6 +1,14 @@
 # fnm
 if command -v fnm >/dev/null 2>&1; then
   eval "$(fnm env --use-on-cd --shell zsh)"
+  _fnm_current="$(fnm current 2>/dev/null || true)"
+  if [[ -z "$_fnm_current" || "$_fnm_current" == "system" || "$_fnm_current" == "none" ]]; then
+    if fnm install --lts >/dev/null 2>&1; then
+      fnm default "$(fnm current)" >/dev/null 2>&1
+      eval "$(fnm env --use-on-cd --shell zsh)"
+    fi
+  fi
+  unset _fnm_current
 fi
 
 # zoxide
