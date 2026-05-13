@@ -73,8 +73,10 @@ The script detects WSL automatically and changes behavior:
 - writes a guarded `.bashrc` block so interactive bash sessions hand off to
   `zsh`
 - adds Windows interop helpers through shell config
-- installs `wslu` and sets `BROWSER=wslview` so `xdg-open` and other tools
-  open URLs in the default Windows browser
+- installs `wslu` (falling back to the upstream `wslutilities/wslu` PPA if
+  the package isn't in the configured apt sources) and sets
+  `BROWSER=wslview` so `xdg-open` and other tools open URLs in the default
+  Windows browser
 
 ## Shell and Prompt Setup
 

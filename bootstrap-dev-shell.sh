@@ -244,12 +244,70 @@ install_ubuntu_base() {
   sudo apt-get install -y build-essential procps curl file git zsh unzip fontconfig gpg
 }
 
+resolve_wslu_ppa_suite() {
+  local current
+  local fallback="oracular"
+  local candidate
+  local suites
+
+  current="$(
+    # shellcheck disable=SC1091
+    . /etc/os-release && printf '%s' "${VERSION_CODENAME:-}"
+  )"
+
+  suites="$(curl -fsSL "https://ppa.launchpadcontent.net/wslutilities/wslu/ubuntu/dists/" 2>/dev/null \
+    | grep -oE 'href="[a-z]+/"' | sed 's#href="##; s#/"##')"
+
+  if [[ -n "$current" ]] && printf '%s\n' "$suites" | grep -Fxq "$current"; then
+    printf '%s\n' "$current"
+    return
+  fi
+
+  for candidate in oracular noble jammy focal; do
+    if printf '%s\n' "$suites" | grep -Fxq "$candidate"; then
+      printf '%s\n' "$candidate"
+      return
+    fi
+  done
+
+  printf '%s\n' "$fallback"
+}
+
+add_wslu_ppa() {
+  local keyring="/etc/apt/keyrings/wslutilities-wslu.gpg"
+  local sources_file="/etc/apt/sources.list.d/wslutilities-wslu.sources"
+  local key_fingerprint="254F460F2970E18123046570C1D0E7E6AB4095D6"
+  local suite
+
+  suite="$(resolve_wslu_ppa_suite)"
+  log "Adding wslutilities/wslu PPA (suite: ${suite}) as a fallback source"
+  sudo install -d -m 0755 /etc/apt/keyrings
+  if [[ ! -f "$keyring" ]]; then
+    curl -fsSL "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x${key_fingerprint}" \
+      | sudo gpg --dearmor -o "$keyring"
+    sudo chmod 0644 "$keyring"
+  fi
+
+  if [[ ! -f "$sources_file" ]]; then
+    printf 'Types: deb\nURIs: https://ppa.launchpadcontent.net/wslutilities/wslu/ubuntu/\nSuites: %s\nComponents: main\nSigned-By: %s\n' \
+      "$suite" "$keyring" | sudo tee "$sources_file" >/dev/null
+  fi
+
+  sudo apt-get update
+}
+
 install_wsl_utilities() {
   if [[ "$IS_WSL" -eq 0 ]]; then
     return
   fi
 
   log "Installing WSL utilities (wslu) for Windows browser/xdg-open integration"
+  if sudo apt-get install -y wslu; then
+    return
+  fi
+
+  log "wslu not available from the configured apt sources; trying the upstream PPA"
+  add_wslu_ppa
   sudo apt-get install -y wslu
 }
 
