@@ -244,6 +244,15 @@ install_ubuntu_base() {
   sudo apt-get install -y build-essential procps curl file git zsh unzip fontconfig gpg
 }
 
+install_wsl_utilities() {
+  if [[ "$IS_WSL" -eq 0 ]]; then
+    return
+  fi
+
+  log "Installing WSL utilities (wslu) for Windows browser/xdg-open integration"
+  sudo apt-get install -y wslu
+}
+
 install_homebrew() {
   if command_exists brew; then
     return
@@ -588,6 +597,7 @@ main() {
 
   if [[ "$OS" == "ubuntu" ]]; then
     install_ubuntu_base
+    install_wsl_utilities
   fi
 
   install_homebrew

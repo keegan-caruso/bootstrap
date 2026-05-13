@@ -56,5 +56,9 @@ if [[ -o interactive && -z "${ZSH_NONINTERACTIVE_SAFE:-}" ]]; then
     alias pbcopy='clip.exe'
     alias pbpaste='powershell.exe -NoProfile -Command Get-Clipboard'
     open() { explorer.exe "${1:-.}"; }
+    # Route xdg-open / $BROWSER through the default Windows browser via wslu.
+    if command -v wslview >/dev/null 2>&1; then
+      export BROWSER=wslview
+    fi
   fi
 fi
