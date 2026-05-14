@@ -27,13 +27,29 @@ The script:
 
 1. Verifies it's running on WSL Ubuntu.
 2. Ensures WSL interop is enabled in `/etc/wsl.conf`.
-3. Installs the [Determinate Systems Nix installer][det] (multi-user,
+3. Enables systemd in `/etc/wsl.conf` via `[boot] systemd = true` (requires
+   `wsl --shutdown` from PowerShell to take effect).
+4. Appends an idempotent block to `/etc/gai.conf` so `getaddrinfo()`
+   prefers IPv4 over IPv6 (uncomments `precedence ::ffff:0:0/96  100`
+   and the `scopev4` NAT/loopback/link-local entries). This avoids long
+   IPv6 timeouts on WSL2 when the upstream network is IPv4-only, without
+   disabling IPv6 on the local link. The block is guarded by a
+   `# codex-dev-shell: prefer IPv4 over IPv6` marker so reruns don't
+   duplicate it.
+5. Writes `/etc/sysctl.d/99-codex-dev-shell.conf` with editor/watcher
+   defaults (`fs.inotify.max_user_watches`, `fs.inotify.max_user_instances`,
+   `vm.max_map_count`) and reloads them in-place.
+6. Installs the [Determinate Systems Nix installer][det] (multi-user,
    flakes enabled).
-4. Installs the flake's `default` package into the user `nix profile`, so
+7. Installs the flake's `default` package into the user `nix profile`, so
    every tool lands in `~/.nix-profile/bin`.
-5. Writes the same shell / Starship / git / jj templates as the Homebrew
+8. Writes the same shell / Starship / git / jj templates as the Homebrew
    bootstrap. `templates/zsh/shell-tools.sh` already exports
    `BROWSER=wslview` when `wslview` is on `PATH`.
+
+For Windows-side `.wslconfig` recommendations (memory caps,
+`networkingMode=mirrored`, DNS tunneling, etc.) see the "Recommended
+Windows-side `.wslconfig`" section in [bootstrap.md](./bootstrap.md).
 
 [det]: https://github.com/DeterminateSystems/nix-installer
 

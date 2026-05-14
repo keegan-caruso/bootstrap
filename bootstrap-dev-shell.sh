@@ -110,6 +110,91 @@ ensure_wsl_interop() {
   log "Restart WSL (wsl --shutdown) to apply interop changes"
 }
 
+ensure_ipv4_precedence() {
+  if [[ "$IS_WSL" -eq 0 ]]; then
+    return
+  fi
+
+  local gai_conf="/etc/gai.conf"
+  local marker="# ${SCRIPT_MARKER}: prefer IPv4 over IPv6"
+
+  if [[ ! -f "$gai_conf" ]]; then
+    log "${gai_conf} not found; skipping IPv4 precedence tweak"
+    return
+  fi
+
+  if sudo grep -Fq "$marker" "$gai_conf"; then
+    log "IPv4 precedence already configured in ${gai_conf}"
+    return
+  fi
+
+  log "Configuring ${gai_conf} to prefer IPv4 over IPv6 for getaddrinfo()"
+  sudo tee -a "$gai_conf" >/dev/null <<EOF
+
+${marker}
+# Prefer IPv4 addresses when a host resolves to both IPv4 and IPv6. This
+# avoids long IPv6 timeouts on WSL2 when only IPv4 is routable outside the
+# local network (e.g. behind a NAT/router that does not understand IPv6),
+# while still allowing IPv6 on the local link.
+precedence ::ffff:0:0/96  100
+# Keep IPv4 NAT/loopback/link-local at the same scope priority as their
+# IPv6 equivalents so they get sorted first.
+scopev4 ::ffff:169.254.0.0/112  2
+scopev4 ::ffff:127.0.0.0/104    2
+scopev4 ::ffff:0.0.0.0/96       14
+EOF
+}
+
+ensure_wsl_systemd() {
+  if [[ "$IS_WSL" -eq 0 ]]; then
+    return
+  fi
+
+  local wsl_conf="/etc/wsl.conf"
+
+  if [[ "$(ps -o comm= 1 2>/dev/null)" == "systemd" ]]; then
+    log "systemd already active as PID 1"
+    return
+  fi
+
+  if [[ -f "$wsl_conf" ]] \
+    && awk '/^\[boot\]/{f=1; next} /^\[/{f=0} f' "$wsl_conf" \
+       | grep -Eq '^[[:space:]]*systemd[[:space:]]*=[[:space:]]*true'; then
+    log "systemd already enabled in ${wsl_conf} (run 'wsl --shutdown' if not yet active)"
+    return
+  fi
+
+  log "Enabling systemd in ${wsl_conf} (run 'wsl --shutdown' for it to take effect)"
+
+  if [[ ! -f "$wsl_conf" ]] || ! grep -q '^\[boot\]' "$wsl_conf"; then
+    printf '\n[boot]\nsystemd = true\n' | sudo tee -a "$wsl_conf" >/dev/null
+  else
+    sudo sed -i -E '/^\[boot\]/,/^\[/{ /^[[:space:]]*systemd[[:space:]]*=/d }' "$wsl_conf"
+    sudo sed -i '/^\[boot\]/a systemd = true' "$wsl_conf"
+  fi
+}
+
+ensure_dev_sysctls() {
+  if [[ "$IS_WSL" -eq 0 ]]; then
+    return
+  fi
+
+  local conf="/etc/sysctl.d/99-${SCRIPT_MARKER}.conf"
+
+  log "Writing editor/watcher sysctl defaults to ${conf}"
+  sudo tee "$conf" >/dev/null <<EOF
+# Managed by ${SCRIPT_MARKER}. Editor / file-watcher friendly defaults.
+# Bumps inotify limits for VS Code, Doom Emacs lsp-mode, tsc --watch, etc.,
+# and raises vm.max_map_count for bundlers and JVM/search tooling.
+fs.inotify.max_user_watches = 524288
+fs.inotify.max_user_instances = 512
+vm.max_map_count = 262144
+EOF
+  if ! sudo sysctl --quiet --load="$conf" 2>/dev/null; then
+    log "sysctl --load failed; settings will apply after 'wsl --shutdown'"
+  fi
+}
+
 find_windows_credential_manager() {
   local paths=(
     "/mnt/c/Program Files/Git/mingw64/bin/git-credential-manager.exe"
@@ -651,6 +736,9 @@ main() {
 
   if [[ "$IS_WSL" -eq 1 ]]; then
     ensure_wsl_interop
+    ensure_wsl_systemd
+    ensure_ipv4_precedence
+    ensure_dev_sysctls
   fi
 
   if [[ "$OS" == "ubuntu" ]]; then

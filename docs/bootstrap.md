@@ -77,6 +77,19 @@ The script detects WSL automatically and changes behavior:
   the package isn't in the configured apt sources) and sets
   `BROWSER=wslview` so `xdg-open` and other tools open URLs in the default
   Windows browser
+- appends an idempotent block to `/etc/gai.conf` so `getaddrinfo()` prefers
+  IPv4 over IPv6. Instead of disabling IPv6 outright, this uncomments the
+  `precedence ::ffff:0:0/96  100` rule plus the `scopev4` NAT/loopback/
+  link-local entries, which avoids long IPv6 timeouts on WSL2 when the
+  upstream network is IPv4-only while still allowing IPv6 on the local
+  link. The block is guarded by a `# codex-dev-shell: prefer IPv4 over
+  IPv6` marker so reruns don't duplicate it
+- enables systemd via `[boot] systemd = true` in `/etc/wsl.conf` so
+  `systemd-timesyncd`, user services, and modern WSL distro features work.
+  Requires `wsl --shutdown` from PowerShell for the change to take effect
+- writes `/etc/sysctl.d/99-codex-dev-shell.conf` with editor/watcher
+  defaults (`fs.inotify.max_user_watches`, `fs.inotify.max_user_instances`,
+  `vm.max_map_count`) and reloads them in-place
 
 ## Shell and Prompt Setup
 
@@ -124,3 +137,30 @@ Git identity values.
 
 If `dotnet` is already installed, the bootstrap also installs `csharpier` as a
 global .NET tool and exposes it through `~/.local/bin`.
+
+## Recommended Windows-side `.wslconfig` (WSL only)
+
+The bootstrap can only touch settings inside the Linux distro. A few
+high-impact tweaks live on the Windows host in `%USERPROFILE%\.wslconfig`
+and need to be applied manually. After editing, run `wsl --shutdown` from
+PowerShell.
+
+```ini
+[wsl2]
+# Cap memory/cpu so WSL doesn't starve the Windows host. Tune to taste.
+memory=12GB
+processors=8
+swap=4GB
+
+# Windows 11 only. Mirrors the Windows network stack into WSL so localhost,
+# VPNs, and IPv6 routes Just Work; tunnels DNS through Windows; respects
+# Windows Firewall and proxy settings.
+networkingMode=mirrored
+dnsTunneling=true
+firewall=true
+autoProxy=true
+```
+
+`networkingMode=mirrored` largely supersedes the in-distro `gai.conf`
+tweak, but the latter is still a safe belt-and-braces fallback for hosts
+that fall back to NAT networking.
