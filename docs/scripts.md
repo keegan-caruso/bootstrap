@@ -68,6 +68,33 @@ Examples:
 .\launch-wt-wsl.ps1 -NewWindow
 ```
 
+## `update-machine-agents-shell-commands.sh`
+
+Adds or updates a managed section in machine-scoped `agents.md` for the
+current shell command tools:
+
+- `bash`
+- `read_bash`
+- `write_bash`
+- `stop_bash`
+
+Defaults to:
+
+```text
+~/.copilot/agents.md
+```
+
+Optional override:
+
+- first positional argument (target file path), or
+- `MACHINE_AGENTS_MD` environment variable.
+
+Run:
+
+```bash
+./update-machine-agents-shell-commands.sh
+```
+
 ## `agent-workflow.example.el`
 
 Example data file for repo-local workflow defaults.

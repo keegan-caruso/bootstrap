@@ -19,6 +19,8 @@ Use these docs as the main reference:
 - `bootstrap-dev-shell.sh`: main bootstrap script
 - `configure-zellij.sh`: writes `~/.config/zellij/config.kdl`
 - `launch-wt-wsl.ps1`: launches Windows Terminal into WSL
+- `update-machine-agents-shell-commands.sh`: updates machine-scoped `agents.md`
+  with current shell command tools
 - `doom/`: Doom Emacs config templates copied into `~/.doom.d`
 - `templates/`: shell and app config templates read by the bootstrap
 - `agent-workflow.example.el`: example repo-local workflow defaults
