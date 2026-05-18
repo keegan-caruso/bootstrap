@@ -732,10 +732,8 @@ configure_git() {
 maybe_update_machine_agents_docs() {
   local updater="${SCRIPT_DIR}/update-machine-agents-shell-commands.sh"
   local enable="${BOOTSTRAP_UPDATE_MACHINE_AGENTS:-0}"
-  local normalized_enable
 
-  normalized_enable="$(printf '%s' "$enable" | tr '[:upper:]' '[:lower:]')"
-  if [[ "$normalized_enable" != "1" && "$normalized_enable" != "true" && "$normalized_enable" != "yes" ]]; then
+  if [[ "$enable" != "1" ]]; then
     log "Skipping machine-scoped agents.md update (set BOOTSTRAP_UPDATE_MACHINE_AGENTS=1 to enable)"
     return
   fi

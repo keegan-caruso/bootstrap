@@ -40,7 +40,7 @@ ensure_file() {
   touch "$file"
 }
 
-normalize_multiline_content() {
+normalize_line_endings_and_trim() {
   local input="$1"
   awk '
     {
@@ -65,7 +65,7 @@ read_template() {
     fail "Template not found: $template_path"
   fi
 
-  normalize_multiline_content "$(cat "$template_path")"
+  normalize_line_endings_and_trim "$(cat "$template_path")"
 }
 
 render_upserted_content() {
