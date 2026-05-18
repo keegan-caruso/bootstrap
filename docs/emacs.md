@@ -9,7 +9,7 @@ It is not the main terminal control plane. The intended split is:
 
 ## First Start
 
-1. Run [bootstrap-dev-shell.sh](/Users/keegancaruso/source/bootstrap/bootstrap-dev-shell.sh).
+1. Run [bootstrap-dev-shell.sh](../bootstrap-dev-shell.sh).
 2. Start Emacs with `emacs`.
 3. Let Doom finish its first-run package setup if prompted.
 4. Open a project directory and start using leader bindings.
@@ -28,15 +28,15 @@ If you change tracked Doom config in this repo later, copy it back into
 
 Tracked source of truth:
 
-- [doom/init.el](/Users/keegancaruso/source/bootstrap/doom/init.el)
-- [doom/config.el](/Users/keegancaruso/source/bootstrap/doom/config.el)
-- [doom/packages.el](/Users/keegancaruso/source/bootstrap/doom/packages.el)
-- [doom/config/core.el](/Users/keegancaruso/source/bootstrap/doom/config/core.el)
-- [doom/config/javascript.el](/Users/keegancaruso/source/bootstrap/doom/config/javascript.el)
-- [doom/config/dotnet.el](/Users/keegancaruso/source/bootstrap/doom/config/dotnet.el)
-- [doom/config/python.el](/Users/keegancaruso/source/bootstrap/doom/config/python.el)
-- [doom/config/rust.el](/Users/keegancaruso/source/bootstrap/doom/config/rust.el)
-- [doom/config/toml.el](/Users/keegancaruso/source/bootstrap/doom/config/toml.el)
+- [doom/init.el](../doom/init.el)
+- [doom/config.el](../doom/config.el)
+- [doom/packages.el](../doom/packages.el)
+- [doom/config/core.el](../doom/config/core.el)
+- [doom/config/javascript.el](../doom/config/javascript.el)
+- [doom/config/dotnet.el](../doom/config/dotnet.el)
+- [doom/config/python.el](../doom/config/python.el)
+- [doom/config/rust.el](../doom/config/rust.el)
+- [doom/config/toml.el](../doom/config/toml.el)
 
 Generated local config:
 
@@ -134,7 +134,7 @@ That file is not executed. It is read as data and used to supply defaults for:
 - Claude
 - GitHub Copilot
 
-See [agent-workflow.example.el](/Users/keegancaruso/source/bootstrap/agent-workflow.example.el).
+See [agent-workflow.example.el](../agent-workflow.example.el).
 
 ## Language Support
 

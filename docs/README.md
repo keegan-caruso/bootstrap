@@ -17,7 +17,9 @@ Use these docs as the main reference:
 ## Repo Layout
 
 - `bootstrap-dev-shell.sh`: main bootstrap script
+- `bootstrap-wsl-nix.sh`: WSL-only bootstrap path using Nix + `nix/flake.nix`
 - `configure-zellij.sh`: writes `~/.config/zellij/config.kdl`
+- `set-default-zsh.sh`: helper to set `zsh` as default shell on Ubuntu
 - `launch-wt-wsl.ps1`: launches Windows Terminal into WSL
 - `doom/`: Doom Emacs config templates copied into `~/.doom.d`
 - `templates/`: shell and app config templates read by the bootstrap
