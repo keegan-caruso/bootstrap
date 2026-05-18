@@ -103,6 +103,11 @@ The bootstrap writes managed blocks into:
 
 Those blocks are sourced from tracked files under `templates/`.
 
+Optional machine-scoped docs update:
+
+- set `BOOTSTRAP_UPDATE_MACHINE_AGENTS=1` when running `./bootstrap-dev-shell.sh`
+  to also run `./update-machine-agents-shell-commands.sh` during bootstrap.
+
 ## Doom Emacs Setup
 
 The bootstrap:

@@ -68,6 +68,72 @@ Examples:
 .\launch-wt-wsl.ps1 -NewWindow
 ```
 
+## `update-machine-agents-shell-commands.sh`
+
+Adds or updates a managed section in machine-scoped `agents.md` for the
+current shell command tools:
+
+- `bash`
+- `read_bash`
+- `write_bash`
+- `stop_bash`
+
+Defaults to:
+
+```text
+~/.copilot/agents.md
+```
+
+Managed section content source:
+
+- `templates/machine-agents/shell-command-tools.md`
+
+Targeting options:
+
+- `--file <path>` (repeatable for multi-target updates)
+- first positional argument (legacy single target), or
+- `MACHINE_AGENTS_MD` environment variable (legacy single target)
+
+Additional options:
+
+- `--section <name>`: override the marker section name (default: `shell-commands`)
+- `--dry-run`: print diffs for pending updates without writing files
+- `--check`: exit non-zero if any target file would change
+- `--help`: print usage
+
+Machine-scoped files matrix:
+
+| Tool | Typical path | Example |
+| --- | --- | --- |
+| GitHub Copilot | `~/.copilot/agents.md` | `./update-machine-agents-shell-commands.sh --file ~/.copilot/agents.md` |
+| Codex | `~/.codex/AGENTS.md` | `./update-machine-agents-shell-commands.sh --file ~/.codex/AGENTS.md` |
+
+Examples:
+
+```bash
+# Default target (~/.copilot/agents.md)
+./update-machine-agents-shell-commands.sh
+
+# Update both Copilot and Codex targets in one run
+./update-machine-agents-shell-commands.sh \
+  --file ~/.copilot/agents.md \
+  --file ~/.codex/AGENTS.md
+
+# Preview diffs without writing
+./update-machine-agents-shell-commands.sh --dry-run --file ~/.codex/AGENTS.md
+
+# CI/pre-commit check mode
+./update-machine-agents-shell-commands.sh --check --file ~/.copilot/agents.md
+```
+
+Bootstrap integration:
+
+- set `BOOTSTRAP_UPDATE_MACHINE_AGENTS=1` before running `./bootstrap-dev-shell.sh`
+  to invoke the updater as an optional bootstrap step.
+
+The updater normalizes line endings and trailing blank lines in the managed
+section to reduce unnecessary diffs across systems.
+
 ## `agent-workflow.example.el`
 
 Example data file for repo-local workflow defaults.
