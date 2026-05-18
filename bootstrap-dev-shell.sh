@@ -729,6 +729,25 @@ configure_git() {
   fi
 }
 
+maybe_update_machine_agents_docs() {
+  local updater="${SCRIPT_DIR}/update-machine-agents-shell-commands.sh"
+  local enable="${BOOTSTRAP_UPDATE_MACHINE_AGENTS:-0}"
+  local normalized_enable
+
+  normalized_enable="$(printf '%s' "$enable" | tr '[:upper:]' '[:lower:]')"
+  if [[ "$normalized_enable" != "1" && "$normalized_enable" != "true" && "$normalized_enable" != "yes" ]]; then
+    log "Skipping machine-scoped agents.md update (set BOOTSTRAP_UPDATE_MACHINE_AGENTS=1 to enable)"
+    return
+  fi
+
+  if [[ ! -x "$updater" ]]; then
+    fail "Expected updater script to be executable: ${updater}"
+  fi
+
+  log "Updating machine-scoped agents.md shell command docs"
+  "$updater"
+}
+
 main() {
   detect_os
   warn_if_slow_wsl_worktree
@@ -764,6 +783,7 @@ main() {
   fi
   configure_git
   write_jj_config
+  maybe_update_machine_agents_docs
 
   log "Bootstrap complete"
   log "Open a new shell or run: source ~/.zshrc"

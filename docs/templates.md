@@ -12,6 +12,7 @@ blocks into user config files.
 - `templates/starship.toml`
 - `templates/ghostty/config`
 - `templates/jj/config.toml.tmpl`
+- `templates/machine-agents/shell-command-tools.md`
 
 ## What They Feed
 
@@ -22,6 +23,8 @@ blocks into user config files.
 - `templates/starship.toml` -> managed block in `~/.config/starship.toml`
 - `templates/ghostty/config` -> managed block in `~/.config/ghostty/config`
 - `templates/jj/config.toml.tmpl` -> rendered into `~/.config/jj/config.toml`
+- `templates/machine-agents/shell-command-tools.md` -> managed section body for
+  machine-scoped `agents.md` updater targets
 
 ## JJ Template Rendering
 
