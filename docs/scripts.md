@@ -21,6 +21,29 @@ Run:
 ./bootstrap-dev-shell.sh
 ```
 
+## `bootstrap-wsl-nix.sh`
+
+WSL-only alternative bootstrap for Ubuntu that uses Nix + `nix/flake.nix`
+instead of Homebrew to install the CLI toolchain.
+
+Main characteristics:
+
+- validates WSL + Ubuntu context
+- ensures WSL interop and systemd configuration
+- applies the same IPv4-preference and watcher/sysctl defaults as the main
+  bootstrap
+- installs Nix and the flake profile under `nix/`
+- writes the same shell, prompt, and jj managed config blocks
+- configures Git identity and related defaults
+
+See [nix-wsl.md](nix-wsl.md) for full behavior and lifecycle commands.
+
+Run:
+
+```bash
+./bootstrap-wsl-nix.sh
+```
+
 ## `configure-zellij.sh`
 
 Writes a managed `~/.config/zellij/config.kdl`.
@@ -40,6 +63,23 @@ Run:
 
 ```bash
 ./configure-zellij.sh
+```
+
+## `set-default-zsh.sh`
+
+Small helper to set `zsh` as the default login shell for the current user on
+Ubuntu.
+
+Main characteristics:
+
+- validates supported OS (macOS/Ubuntu detection)
+- ensures `zsh` exists and is present in `/etc/shells`
+- runs `chsh -s "$(command -v zsh)"` when needed on Ubuntu
+
+Run:
+
+```bash
+./set-default-zsh.sh
 ```
 
 ## `launch-wt-wsl.ps1`
