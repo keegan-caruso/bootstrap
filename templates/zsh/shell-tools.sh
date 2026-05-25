@@ -56,19 +56,45 @@ if [[ -o interactive && -z "${ZSH_NONINTERACTIVE_SAFE:-}" ]]; then
     alias pbcopy='clip.exe'
     alias pbpaste='powershell.exe -NoProfile -Command Get-Clipboard'
     open() { explorer.exe "${1:-.}"; }
-    # Route xdg-open / $BROWSER at a real Windows browser binary when one is
-    # available. wslview / wslu invoke explorer.exe directly, which — when the
-    # WSL cwd is a Linux/UNC path — also pops a spurious Explorer window at
-    # ~/Documents on the Windows side. Pointing at the browser .exe bypasses
-    # explorer.exe entirely. Falls back to wslview if neither is installed.
-    if [[ -x "/mnt/c/Program Files (x86)/Microsoft/Edge/Application/msedge.exe" ]]; then
-      export BROWSER="/mnt/c/Program Files (x86)/Microsoft/Edge/Application/msedge.exe"
-    elif [[ -x "/mnt/c/Program Files/Microsoft/Edge/Application/msedge.exe" ]]; then
-      export BROWSER="/mnt/c/Program Files/Microsoft/Edge/Application/msedge.exe"
-    elif [[ -x "/mnt/c/Program Files/Google/Chrome/Application/chrome.exe" ]]; then
-      export BROWSER="/mnt/c/Program Files/Google/Chrome/Application/chrome.exe"
+    # Route xdg-open / $BROWSER at a Windows browser binary via a wrapper.
+    # Why a wrapper:
+    #   1. wslu / wslview invoke explorer.exe directly, which (when the WSL
+    #      cwd is a Linux/UNC path) pops a spurious Explorer window at
+    #      ~/Documents on the Windows side.
+    #   2. sensible-browser does `eval "$BROWSER \"$@\""`, so $BROWSER set
+    #      to a path containing spaces or `(x86)` blows up with a syntax
+    #      error and falls back to x-www-browser -> wslview anyway.
+    # The wrapper has no spaces in its name and probes Edge -> Chrome ->
+    # wslview internally.
+    _wsl_browser="$HOME/.local/bin/wsl-browser"
+    if [[ ! -x "$_wsl_browser" ]]; then
+      mkdir -p "$HOME/.local/bin"
+      cat > "$_wsl_browser" <<'WSL_BROWSER_EOF'
+#!/bin/sh
+# wsl-browser: open URLs in a Windows browser without going through
+# explorer.exe. Managed by ~/bootstrap; safe to regenerate.
+for candidate in \
+  "/mnt/c/Program Files (x86)/Microsoft/Edge/Application/msedge.exe" \
+  "/mnt/c/Program Files/Microsoft/Edge/Application/msedge.exe" \
+  "/mnt/c/Program Files/Google/Chrome/Application/chrome.exe"
+do
+  if [ -x "$candidate" ]; then
+    exec "$candidate" "$@"
+  fi
+done
+if command -v wslview >/dev/null 2>&1; then
+  exec wslview "$@"
+fi
+echo "wsl-browser: no Windows browser found and wslview not installed" >&2
+exit 127
+WSL_BROWSER_EOF
+      chmod +x "$_wsl_browser"
+    fi
+    if [[ -x "$_wsl_browser" ]]; then
+      export BROWSER="$_wsl_browser"
     elif command -v wslview >/dev/null 2>&1; then
       export BROWSER=wslview
     fi
+    unset _wsl_browser
   fi
 fi
