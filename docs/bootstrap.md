@@ -12,7 +12,7 @@ The script installs and configures:
 
 - Homebrew
 - core CLI tools such as `fd`, `rg`, `bat`, `eza`, `git`, `gh`, `jj`,
-  `jq`, `zellij`, `starship`
+  `jq`, `zellij`, `starship`, `zsh-autosuggestions`, `zsh-syntax-highlighting`
 - utility tools such as `delta`, `zoxide`, `hyperfine`, `tokei`, `dust`,
   `duf`, `bottom`, `procs`, `ncdu`, `xh`, `doggo`
 - JavaScript toolchain support through `fnm`, Node.js LTS, Corepack,
@@ -81,7 +81,14 @@ The script detects WSL automatically and changes behavior:
   Explorer window on `Documents` when the WSL cwd is a Linux/UNC path, and
   (2) `sensible-browser` does `eval "$BROWSER ..."`, so a `$BROWSER` set
   directly to `/mnt/c/Program Files (x86)/...` fails with a shell syntax
-  error and silently falls back to `wslview`
+  error and silently falls back to `wslview`. The block also symlinks the
+  wrapper as `~/.local/bin/xdg-open` so .NET's `Process.Start(url,
+  UseShellExecute=true)` (used by MSAL's interactive auth flow) picks it
+  up, and exports
+  `ARTIFACTS_CREDENTIALPROVIDER_MSAL_ALLOW_BROKER=false` to disable the
+  MSAL broker for `@microsoft/artifacts-npm-credprovider` — on WSL the
+  broker bridges to Windows WAM via interop and inherits the Linux/UNC
+  cwd, which also pops Explorer at `~/Documents`
 - appends an idempotent block to `/etc/gai.conf` so `getaddrinfo()` prefers
   IPv4 over IPv6. Instead of disabling IPv6 outright, this uncomments the
   `precedence ::ffff:0:0/96  100` rule plus the `scopev4` NAT/loopback/

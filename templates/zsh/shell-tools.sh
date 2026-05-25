@@ -65,7 +65,10 @@ if [[ -o interactive && -z "${ZSH_NONINTERACTIVE_SAFE:-}" ]]; then
     #      to a path containing spaces or `(x86)` blows up with a syntax
     #      error and falls back to x-www-browser -> wslview anyway.
     # The wrapper has no spaces in its name and probes Edge -> Chrome ->
-    # wslview internally.
+    # wslview internally. We also symlink it as `xdg-open` so .NET's
+    # Process.Start(url, UseShellExecute=true) picks it up (it looks for
+    # xdg-open / gnome-open / kfmclient on PATH; MSAL.NET uses this for
+    # interactive auth).
     _wsl_browser="$HOME/.local/bin/wsl-browser"
     if [[ ! -x "$_wsl_browser" ]]; then
       mkdir -p "$HOME/.local/bin"
@@ -90,11 +93,19 @@ exit 127
 WSL_BROWSER_EOF
       chmod +x "$_wsl_browser"
     fi
+    if [[ -x "$_wsl_browser" ]] && [[ ! -e "$HOME/.local/bin/xdg-open" ]]; then
+      ln -s "$_wsl_browser" "$HOME/.local/bin/xdg-open"
+    fi
     if [[ -x "$_wsl_browser" ]]; then
       export BROWSER="$_wsl_browser"
     elif command -v wslview >/dev/null 2>&1; then
       export BROWSER=wslview
     fi
     unset _wsl_browser
+    # artifacts-credprovider: disable the MSAL broker on WSL. The broker
+    # bridges to Windows WAM via interop and inherits the Linux/UNC cwd,
+    # popping Explorer at ~/Documents. With this off, MSAL falls back to
+    # the system browser (via our xdg-open shim) or device code.
+    export ARTIFACTS_CREDENTIALPROVIDER_MSAL_ALLOW_BROKER=false
   fi
 fi

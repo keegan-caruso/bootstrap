@@ -49,7 +49,14 @@ The script:
    `wslview`, and exports `BROWSER` pointing at it. The wrapper avoids
    two related bugs: `explorer.exe`'s spurious Documents popup when
    invoked with a UNC cwd, and `sensible-browser`'s `eval "$BROWSER ..."`
-   syntax error when `$BROWSER` contains spaces or `(x86)`.
+   syntax error when `$BROWSER` contains spaces or `(x86)`. The template
+   also symlinks the wrapper as `~/.local/bin/xdg-open` (so .NET's
+   `Process.Start(url, UseShellExecute=true)` and MSAL interactive auth
+   pick it up) and exports
+   `ARTIFACTS_CREDENTIALPROVIDER_MSAL_ALLOW_BROKER=false` to disable
+   the MSAL broker for `@microsoft/artifacts-npm-credprovider`, which on
+   WSL bridges to Windows WAM via interop and triggers the same
+   Documents popup.
 
 For Windows-side `.wslconfig` recommendations (memory caps,
 `networkingMode=mirrored`, DNS tunneling, etc.) see the "Recommended
