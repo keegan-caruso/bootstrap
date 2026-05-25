@@ -56,8 +56,18 @@ if [[ -o interactive && -z "${ZSH_NONINTERACTIVE_SAFE:-}" ]]; then
     alias pbcopy='clip.exe'
     alias pbpaste='powershell.exe -NoProfile -Command Get-Clipboard'
     open() { explorer.exe "${1:-.}"; }
-    # Route xdg-open / $BROWSER through the default Windows browser via wslu.
-    if command -v wslview >/dev/null 2>&1; then
+    # Route xdg-open / $BROWSER at a real Windows browser binary when one is
+    # available. wslview / wslu invoke explorer.exe directly, which — when the
+    # WSL cwd is a Linux/UNC path — also pops a spurious Explorer window at
+    # ~/Documents on the Windows side. Pointing at the browser .exe bypasses
+    # explorer.exe entirely. Falls back to wslview if neither is installed.
+    if [[ -x "/mnt/c/Program Files (x86)/Microsoft/Edge/Application/msedge.exe" ]]; then
+      export BROWSER="/mnt/c/Program Files (x86)/Microsoft/Edge/Application/msedge.exe"
+    elif [[ -x "/mnt/c/Program Files/Microsoft/Edge/Application/msedge.exe" ]]; then
+      export BROWSER="/mnt/c/Program Files/Microsoft/Edge/Application/msedge.exe"
+    elif [[ -x "/mnt/c/Program Files/Google/Chrome/Application/chrome.exe" ]]; then
+      export BROWSER="/mnt/c/Program Files/Google/Chrome/Application/chrome.exe"
+    elif command -v wslview >/dev/null 2>&1; then
       export BROWSER=wslview
     fi
   fi

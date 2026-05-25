@@ -44,8 +44,12 @@ The script:
 7. Installs the flake's `default` package into the user `nix profile`, so
    every tool lands in `~/.nix-profile/bin`.
 8. Writes the same shell / Starship / git / jj templates as the Homebrew
-   bootstrap. `templates/zsh/shell-tools.sh` already exports
-   `BROWSER=wslview` when `wslview` is on `PATH`.
+   bootstrap. `templates/zsh/shell-tools.sh` exports `BROWSER` pointing
+   at Edge or Chrome's `.exe` when one is installed, falling back to
+   `wslview` if neither is present. (Pointing directly at the browser
+   binary avoids a known `explorer.exe`-with-UNC-cwd bug that pops a
+   spurious Explorer window on `Documents` whenever wslu launches a URL
+   from a Linux cwd.)
 
 For Windows-side `.wslconfig` recommendations (memory caps,
 `networkingMode=mirrored`, DNS tunneling, etc.) see the "Recommended

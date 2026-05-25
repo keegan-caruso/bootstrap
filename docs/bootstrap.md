@@ -74,9 +74,11 @@ The script detects WSL automatically and changes behavior:
   `zsh`
 - adds Windows interop helpers through shell config
 - installs `wslu` (falling back to the upstream `wslutilities/wslu` PPA if
-  the package isn't in the configured apt sources) and sets
-  `BROWSER=wslview` so `xdg-open` and other tools open URLs in the default
-  Windows browser
+  the package isn't in the configured apt sources) and sets `BROWSER` to
+  the Edge or Chrome `.exe` when one is installed (falling back to
+  `wslview`) so `xdg-open` and other tools open URLs in the default
+  Windows browser without spawning a spurious Explorer window on
+  Documents (a known `explorer.exe`-with-UNC-cwd bug)
 - appends an idempotent block to `/etc/gai.conf` so `getaddrinfo()` prefers
   IPv4 over IPv6. Instead of disabling IPv6 outright, this uncomments the
   `precedence ::ffff:0:0/96  100` rule plus the `scopev4` NAT/loopback/
