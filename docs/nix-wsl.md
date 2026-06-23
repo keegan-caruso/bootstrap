@@ -82,7 +82,6 @@ Terminal (via WSL), etc.
 
 Out of scope for this script (handle separately if needed):
 
-- Doom Emacs
 - VS Code launcher (`~/.local/bin/code` wrapper)
 
 ## Updating

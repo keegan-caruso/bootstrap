@@ -11,7 +11,6 @@ Main machine bootstrap. It handles:
 - Node.js installation through `fnm`
 - fallback global npm packages
 - VS Code installation or WSL launcher setup
-- Doom Emacs installation
 - shell, prompt, Ghostty, and JJ config generation
 - Git configuration
 
@@ -67,15 +66,3 @@ Examples:
 .\launch-wt-wsl.ps1 -Distro Ubuntu -WorkingDirectory /home/your-user/src
 .\launch-wt-wsl.ps1 -NewWindow
 ```
-
-## `agent-workflow.example.el`
-
-Example data file for repo-local workflow defaults.
-
-Projects can copy it to:
-
-```elisp
-agent-workflow.el
-```
-
-The file is read as data, not executed code.

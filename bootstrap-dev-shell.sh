@@ -48,6 +48,8 @@ BREW_PACKAGES=(
   xclip
   zellij
   starship
+  zsh-autosuggestions
+  zsh-syntax-highlighting
 )
 NPM_GLOBAL_PACKAGES=(
   typescript
@@ -184,7 +186,7 @@ ensure_dev_sysctls() {
   log "Writing editor/watcher sysctl defaults to ${conf}"
   sudo tee "$conf" >/dev/null <<EOF
 # Managed by ${SCRIPT_MARKER}. Editor / file-watcher friendly defaults.
-# Bumps inotify limits for VS Code, Doom Emacs lsp-mode, tsc --watch, etc.,
+# Bumps inotify limits for VS Code, language servers, tsc --watch, etc.,
 # and raises vm.max_map_count for bundlers and JVM/search tooling.
 fs.inotify.max_user_watches = 524288
 fs.inotify.max_user_instances = 512
@@ -583,61 +585,6 @@ install_vscode() {
   sudo apt-get install -y code
 }
 
-write_doom_config() {
-  local doom_config_dir="${HOME}/.doom.d"
-  local source_dir="${SCRIPT_DIR}/doom"
-  local source_file
-  local relative_path
-
-  mkdir -p "$doom_config_dir"
-  if [[ ! -f "${source_dir}/init.el" || ! -f "${source_dir}/config.el" || ! -f "${source_dir}/packages.el" ]]; then
-    fail "Doom config templates were not found in ${source_dir}"
-  fi
-
-  while IFS= read -r source_file; do
-    relative_path="${source_file#"${source_dir}"/}"
-    mkdir -p "$(dirname "${doom_config_dir}/${relative_path}")"
-    install -m 0644 "${source_file}" "${doom_config_dir}/${relative_path}"
-  done < <(find "${source_dir}" -type f)
-}
-
-install_doom_emacs() {
-  local emacs_dir="${HOME}/.emacs.d"
-  local doom_repo="https://github.com/doomemacs/doomemacs"
-
-  log "Installing Emacs and Doom Emacs"
-
-  if [[ "$OS" == "macos" ]]; then
-    brew tap d12frosted/emacs-plus
-    brew install --cask emacs-plus-app
-  elif [[ "$OS" == "ubuntu" ]]; then
-    brew install emacs
-  fi
-
-  if [[ -e "$emacs_dir" && ! -d "${emacs_dir}/.git" ]]; then
-    fail "${emacs_dir} already exists and is not a Git checkout. Move it aside before running this script."
-  fi
-
-  if [[ -d "${emacs_dir}/.git" ]]; then
-    local current_remote
-    current_remote="$(git -C "$emacs_dir" remote get-url origin 2>/dev/null || true)"
-    if [[ "$current_remote" != "$doom_repo" ]]; then
-      fail "${emacs_dir} already exists and is not the Doom Emacs repository. Move it aside before running this script."
-    fi
-    git -C "$emacs_dir" pull --ff-only
-  else
-    git clone --depth 1 "$doom_repo" "$emacs_dir"
-  fi
-
-  write_doom_config
-
-  if [[ -f "${HOME}/.spacemacs" ]]; then
-    log "Existing ~/.spacemacs detected; Doom Emacs will use ~/.doom.d instead."
-  fi
-
-  YES=1 "${emacs_dir}/bin/doom" install --force
-}
-
 prompt_for_git_email() {
   local input
 
@@ -654,16 +601,22 @@ prompt_for_git_email() {
 write_zshrc_blocks() {
   local zshrc="${HOME}/.zshrc"
   local local_bin_block
+  local interactive_block
   local prompt_block
   local shell_block
+  local syntax_hl_block
 
   local_bin_block="$(read_template "${SCRIPT_DIR}/templates/zsh/path.sh")"
+  interactive_block="$(read_template "${SCRIPT_DIR}/templates/zsh/interactive.sh")"
   prompt_block="$(read_template "${SCRIPT_DIR}/templates/zsh/prompt.sh")"
   shell_block="$(read_template "${SCRIPT_DIR}/templates/zsh/shell-tools.sh")"
+  syntax_hl_block="$(read_template "${SCRIPT_DIR}/templates/zsh/syntax-highlighting.sh")"
 
   upsert_block "$zshrc" "path" "$local_bin_block"
+  upsert_block "$zshrc" "interactive" "$interactive_block"
   upsert_block "$zshrc" "prompt" "$prompt_block"
   upsert_block "$zshrc" "shell-tools" "$shell_block"
+  upsert_block "$zshrc" "syntax-highlighting" "$syntax_hl_block"
 }
 
 write_bashrc_wsl_block() {
@@ -752,7 +705,6 @@ main() {
   install_npm_global_packages
   install_csharpier_if_dotnet_available
   install_vscode
-  install_doom_emacs
   prompt_for_git_email
   write_zshrc_blocks
   if [[ "$IS_WSL" -eq 1 ]]; then

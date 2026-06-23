@@ -47,8 +47,8 @@
       # Mirrors the CLI subset of BREW_PACKAGES in bootstrap-dev-shell.sh.
       # `wslview` is provided locally because the upstream `wslu` package
       # was removed from nixpkgs after its project was archived.
-      # Doom Emacs and the VS Code launcher are intentionally out of scope
-      # here; Nerd Fonts are bundled separately below.
+      # The VS Code launcher is intentionally out of scope here; Nerd Fonts
+      # are bundled separately below.
       cliTools = with pkgs; [
         # search & navigation
         fzf
@@ -111,6 +111,8 @@
         # terminal UX
         zellij
         starship
+        zsh-autosuggestions
+        zsh-syntax-highlighting
 
         # WSL <-> Windows integration
         wslview

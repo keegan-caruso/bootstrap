@@ -23,7 +23,6 @@ The script installs and configures:
 - shell and markup tooling through `shellcheck`, `shfmt`,
   `markdownlint-cli2`, `pandoc`, `yamllint`, `yq`
 - VS Code
-- Doom Emacs
 - global Git and Jujutsu identity/config
 - fallback/editor fonts such as JetBrains Mono Nerd Font, Symbols Nerd Font
   Mono, and Symbola
@@ -43,7 +42,6 @@ tools when present.
 The script:
 
 - uses Homebrew under `/opt/homebrew` or `/usr/local`
-- installs `emacs-plus-app` from `d12frosted/emacs-plus`
 - installs JetBrains Mono Nerd Font through Homebrew Casks
 - installs Symbols Nerd Font Mono through Homebrew Casks
 - installs the Symbola fallback font into `~/Library/Fonts`
@@ -56,7 +54,6 @@ The script:
 
 - installs a small base package set with `apt-get`
 - installs the rest of the CLI stack through Homebrew
-- installs Emacs through Homebrew
 - installs VS Code through Microsoft’s apt repository
 - installs JetBrains Mono Nerd Font, Symbols Nerd Font Mono, and Symbola into
   the user font directory
@@ -114,17 +111,6 @@ The bootstrap writes managed blocks into:
 - `~/.config/jj/config.toml`
 
 Those blocks are sourced from tracked files under `templates/`.
-
-## Doom Emacs Setup
-
-The bootstrap:
-
-- installs Doom Emacs into `~/.emacs.d`
-- copies the tracked `doom/` tree into `~/.doom.d`
-- runs `~/.emacs.d/bin/doom install --force`
-
-If `~/.emacs.d` already exists and is not the Doom Emacs repository, the
-script stops instead of overwriting it.
 
 ## Git and JJ Setup
 

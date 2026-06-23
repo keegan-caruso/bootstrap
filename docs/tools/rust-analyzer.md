@@ -7,4 +7,4 @@
 - `rust-analyzer --version`: show the installed version
 - `rust-analyzer`: start the language server
 
-In practice, this tool is usually started by Emacs or another editor.
+In practice, this tool is usually started by an editor.

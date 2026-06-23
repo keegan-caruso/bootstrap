@@ -198,7 +198,7 @@ ensure_dev_sysctls() {
   log "Writing editor/watcher sysctl defaults to ${conf}"
   sudo tee "$conf" >/dev/null <<EOF
 # Managed by ${SCRIPT_MARKER}. Editor / file-watcher friendly defaults.
-# Bumps inotify limits for VS Code, Doom Emacs lsp-mode, tsc --watch, etc.,
+# Bumps inotify limits for VS Code, language servers, tsc --watch, etc.,
 # and raises vm.max_map_count for bundlers and JVM/search tooling.
 fs.inotify.max_user_watches = 524288
 fs.inotify.max_user_instances = 512
@@ -333,8 +333,10 @@ EOF
 write_zshrc_blocks() {
   local zshrc="${HOME}/.zshrc"
   upsert_block "$zshrc" "path" "$(read_template "${SCRIPT_DIR}/templates/zsh/path.sh")"
+  upsert_block "$zshrc" "interactive" "$(read_template "${SCRIPT_DIR}/templates/zsh/interactive.sh")"
   upsert_block "$zshrc" "prompt" "$(read_template "${SCRIPT_DIR}/templates/zsh/prompt.sh")"
   upsert_block "$zshrc" "shell-tools" "$(read_template "${SCRIPT_DIR}/templates/zsh/shell-tools.sh")"
+  upsert_block "$zshrc" "syntax-highlighting" "$(read_template "${SCRIPT_DIR}/templates/zsh/syntax-highlighting.sh")"
 }
 
 write_bashrc_wsl_block() {
@@ -446,7 +448,7 @@ main() {
 
   log "Nix-based WSL bootstrap complete"
   log "Open a new shell or run: source ~/.zshrc"
-  log "Doom Emacs and the VS Code launcher are out of scope for this script;"
+  log "The VS Code launcher is out of scope for this script;"
   log "see docs/nix-wsl.md."
 }
 
