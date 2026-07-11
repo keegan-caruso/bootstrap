@@ -8,6 +8,36 @@ setopt HIST_IGNORE_SPACE
 setopt HIST_REDUCE_BLANKS
 setopt INC_APPEND_HISTORY
 
+# key bindings
+bindkey -e
+
+# word navigation (Ctrl+Left / Ctrl+Right) across common terminal encodings
+bindkey '^[[1;5C' forward-word
+bindkey '^[[1;5D' backward-word
+bindkey '^[[1;3C' forward-word
+bindkey '^[[1;3D' backward-word
+bindkey '^[[5C'   forward-word
+bindkey '^[[5D'   backward-word
+bindkey '^[Oc'    forward-word
+bindkey '^[Od'    backward-word
+bindkey '^[f'     forward-word
+bindkey '^[b'     backward-word
+
+# word deletion (Ctrl+Backspace / Ctrl+Delete)
+bindkey '^H'      backward-kill-word
+bindkey '^[[3;5~' kill-word
+
+# Home / End
+bindkey '^[[H'    beginning-of-line
+bindkey '^[[F'    end-of-line
+bindkey '^[[1~'   beginning-of-line
+bindkey '^[[4~'   end-of-line
+bindkey '^[OH'    beginning-of-line
+bindkey '^[OF'    end-of-line
+
+# Delete key
+bindkey '^[[3~'   delete-char
+
 # completion
 if [[ -o interactive && -z "${ZSH_NONINTERACTIVE_SAFE:-}" ]]; then
   autoload -Uz compinit && compinit -C
