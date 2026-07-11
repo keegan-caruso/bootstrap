@@ -331,6 +331,20 @@ install_ubuntu_base() {
   sudo apt-get install -y build-essential procps curl file git zsh unzip fontconfig gpg
 }
 
+install_secure_credential_storage() {
+  # The GitHub Copilot CLI (and other tools) store their auth token via the
+  # freedesktop Secret Service. Without a backend it fails to log in with:
+  #   "The recommended secure storage (keychain, keyring, or credential
+  #    manager) is not installed."
+  # gnome-keyring provides the Secret Service backend and libsecret is the
+  # client library; libsecret-tools ships secret-tool for verification. With
+  # the systemd user session enabled (see ensure_wsl_systemd), gnome-keyring
+  # is D-Bus activated on demand and its login keyring auto-unlocks, so this
+  # works headlessly under WSL as well as on a desktop.
+  log "Installing secure credential storage (gnome-keyring + libsecret)"
+  sudo apt-get install -y gnome-keyring libsecret-1-0 libsecret-tools
+}
+
 resolve_wslu_ppa_suite() {
   local current
   local fallback="oracular"
@@ -479,13 +493,13 @@ install_node_with_fnm() {
   eval "$(fnm env --use-on-cd --shell bash)"
 
   node_version="$(fnm current 2>/dev/null || true)"
-  if [[ -z "$node_version" || "$node_version" == "system" ]]; then
+  if [[ -z "$node_version" || "$node_version" == "system" || "$node_version" == "none" ]]; then
     log "Installing Node.js LTS with fnm"
     fnm install --lts
     node_version="$(fnm current 2>/dev/null || true)"
   fi
 
-  if [[ -z "$node_version" || "$node_version" == "system" ]]; then
+  if [[ -z "$node_version" || "$node_version" == "system" || "$node_version" == "none" ]]; then
     fail "fnm did not provide a managed Node.js runtime."
   fi
 
@@ -696,6 +710,7 @@ main() {
 
   if [[ "$OS" == "ubuntu" ]]; then
     install_ubuntu_base
+    install_secure_credential_storage
     install_wsl_utilities
   fi
 

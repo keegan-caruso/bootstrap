@@ -53,6 +53,9 @@ The script:
 The script:
 
 - installs a small base package set with `apt-get`
+- installs `gnome-keyring` and `libsecret` so the freedesktop Secret Service
+  is available for tools that store tokens there (e.g. the GitHub Copilot CLI
+  login), avoiding the "recommended secure storage ... is not installed" error
 - installs the rest of the CLI stack through Homebrew
 - installs VS Code through Microsoft’s apt repository
 - installs JetBrains Mono Nerd Font, Symbols Nerd Font Mono, and Symbola into
