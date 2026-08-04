@@ -405,6 +405,8 @@ default_mode "normal"
 default_shell "/bin/zsh"
 default_layout "coding"
 theme "github-light-shell"
+theme_dark "github-dark-shell"
+theme_light "github-light-shell"
 ${copy_command_line}
 copy_clipboard "system"
 copy_on_select false
@@ -549,6 +551,132 @@ themes {
             player_8 221 244 255
             player_9 208 215 222
             player_10 36 41 47
+        }
+    }
+    github-dark-shell {
+        text_unselected {
+            base 230 237 243
+            background 13 17 23
+            emphasis_0 210 153 34
+            emphasis_1 88 166 255
+            emphasis_2 63 185 80
+            emphasis_3 188 140 255
+        }
+        text_selected {
+            base 240 246 252
+            background 31 111 235
+            emphasis_0 240 246 252
+            emphasis_1 121 192 255
+            emphasis_2 86 211 100
+            emphasis_3 255 123 114
+        }
+        ribbon_unselected {
+            base 230 237 243
+            background 33 38 45
+            emphasis_0 139 148 158
+            emphasis_1 88 166 255
+            emphasis_2 63 185 80
+            emphasis_3 210 153 34
+        }
+        ribbon_selected {
+            base 13 17 23
+            background 88 166 255
+            emphasis_0 13 17 23
+            emphasis_1 31 111 235
+            emphasis_2 46 160 67
+            emphasis_3 248 81 73
+        }
+        table_title {
+            base 230 237 243
+            background 33 38 45
+            emphasis_0 88 166 255
+            emphasis_1 188 140 255
+            emphasis_2 63 185 80
+            emphasis_3 248 81 73
+        }
+        table_cell_unselected {
+            base 230 237 243
+            background 13 17 23
+            emphasis_0 139 148 158
+            emphasis_1 88 166 255
+            emphasis_2 63 185 80
+            emphasis_3 210 153 34
+        }
+        table_cell_selected {
+            base 240 246 252
+            background 31 111 235
+            emphasis_0 240 246 252
+            emphasis_1 121 192 255
+            emphasis_2 86 211 100
+            emphasis_3 255 123 114
+        }
+        list_unselected {
+            base 230 237 243
+            background 13 17 23
+            emphasis_0 139 148 158
+            emphasis_1 88 166 255
+            emphasis_2 63 185 80
+            emphasis_3 210 153 34
+        }
+        list_selected {
+            base 240 246 252
+            background 31 111 235
+            emphasis_0 240 246 252
+            emphasis_1 121 192 255
+            emphasis_2 86 211 100
+            emphasis_3 255 123 114
+        }
+        frame_unselected {
+            base 48 54 61
+            background 13 17 23
+            emphasis_0 139 148 158
+            emphasis_1 48 54 61
+            emphasis_2 48 54 61
+            emphasis_3 48 54 61
+        }
+        frame_selected {
+            base 88 166 255
+            background 13 17 23
+            emphasis_0 88 166 255
+            emphasis_1 188 140 255
+            emphasis_2 63 185 80
+            emphasis_3 248 81 73
+        }
+        frame_highlight {
+            base 188 140 255
+            background 13 17 23
+            emphasis_0 188 140 255
+            emphasis_1 88 166 255
+            emphasis_2 63 185 80
+            emphasis_3 248 81 73
+        }
+        exit_code_success {
+            base 63 185 80
+            background 13 17 23
+            emphasis_0 63 185 80
+            emphasis_1 63 185 80
+            emphasis_2 63 185 80
+            emphasis_3 63 185 80
+        }
+        exit_code_error {
+            base 248 81 73
+            background 13 17 23
+            emphasis_0 248 81 73
+            emphasis_1 248 81 73
+            emphasis_2 248 81 73
+            emphasis_3 248 81 73
+        }
+        multiplayer_user_colors {
+            player_1 88 166 255
+            player_2 63 185 80
+            player_3 188 140 255
+            player_4 248 81 73
+            player_5 210 153 34
+            player_6 230 237 243
+            player_7 139 148 158
+            player_8 121 192 255
+            player_9 48 54 61
+            player_10 240 246 252
         }
     }
 }

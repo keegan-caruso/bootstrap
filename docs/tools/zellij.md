@@ -9,4 +9,6 @@
 - `zellij list-sessions`: list sessions
 - `zellij kill-session <name>`: remove a session
 
-This repo also provides `configure-zellij.sh` to write an opinionated config.
+This repo also provides `configure-zellij.sh` to write an opinionated config
+with high-contrast GitHub light/dark themes. The light theme is the fallback
+when the terminal does not report its appearance.

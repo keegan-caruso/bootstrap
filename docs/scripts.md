@@ -33,7 +33,9 @@ Main characteristics:
   - `wl-copy`
   - `xclip`
   - `xsel`
-- light theme and opinionated keymap
+- high-contrast GitHub light/dark themes with automatic terminal appearance detection
+- GitHub light theme fallback for terminals that do not report their appearance
+- opinionated keymap
 
 Run:
 

@@ -90,6 +90,7 @@
         shellcheck
         shfmt
         ruff
+        ty
         uv
 
         # observability / metrics
