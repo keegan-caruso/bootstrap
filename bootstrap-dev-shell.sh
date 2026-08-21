@@ -112,6 +112,22 @@ ensure_wsl_interop() {
   log "Restart WSL (wsl --shutdown) to apply interop changes"
 }
 
+install_wsl_browser() {
+  if [[ "$IS_WSL" -eq 0 ]]; then
+    return
+  fi
+
+  local local_bin="${HOME}/.local/bin"
+  local browser="${local_bin}/wsl-browser"
+  local xdg_open="${local_bin}/xdg-open"
+
+  mkdir -p "$local_bin"
+  install -m 0755 "${SCRIPT_DIR}/templates/wsl-browser" "$browser"
+  if [[ ! -e "$xdg_open" && ! -L "$xdg_open" ]]; then
+    ln -s "$browser" "$xdg_open"
+  fi
+}
+
 ensure_ipv4_precedence() {
   if [[ "$IS_WSL" -eq 0 ]]; then
     return
@@ -316,13 +332,40 @@ upsert_block() {
   ) 9>"${file}.lock"
 }
 
-append_unique_line() {
+remove_block() {
+  local file="$1"
+  local name="$2"
+  local start="# >>> ${SCRIPT_MARKER}:${name}"
+  local end="# <<< ${SCRIPT_MARKER}:${name}"
+  local tmp
+
+  [[ -f "$file" ]] || return
+  tmp="$(mktemp)" || fail "Failed to create temporary file"
+
+  (
+    flock -x 9 || fail "Failed to acquire lock on ${file}"
+    awk -v start="$start" -v end="$end" '
+      $0 == start { in_block = 1; next }
+      $0 == end { in_block = 0; next }
+      !in_block { print }
+    ' "$file" >"$tmp"
+    mv "$tmp" "$file"
+  ) 9>"${file}.lock"
+}
+
+remove_exact_line() {
   local file="$1"
   local line="$2"
+  local tmp
+
   ensure_file "$file"
-  if ! grep -Fqx "$line" "$file"; then
-    printf '%s\n' "$line" >>"$file"
-  fi
+  tmp="$(mktemp)" || fail "Failed to create temporary file"
+
+  (
+    flock -x 9 || fail "Failed to acquire lock on ${file}"
+    awk -v line="$line" '$0 != line { print }' "$file" >"$tmp"
+    mv "$tmp" "$file"
+  ) 9>"${file}.lock"
 }
 
 install_ubuntu_base() {
@@ -422,6 +465,8 @@ install_homebrew() {
 }
 
 setup_brew_env() {
+  local zsh_shellenv
+
   if [[ "$OS" == "macos" ]]; then
     BREW_PREFIX="/opt/homebrew"
     if [[ ! -x "${BREW_PREFIX}/bin/brew" && -x "/usr/local/bin/brew" ]]; then
@@ -435,8 +480,10 @@ setup_brew_env() {
     fail "Homebrew installation was not found at ${BREW_PREFIX}/bin/brew"
   fi
 
-  eval "$("${BREW_PREFIX}/bin/brew" shellenv)"
-  append_unique_line "${HOME}/.zprofile" "eval \"\$(\"${BREW_PREFIX}/bin/brew\" shellenv)\""
+  eval "$("${BREW_PREFIX}/bin/brew" shellenv bash)"
+  zsh_shellenv="$("${BREW_PREFIX}/bin/brew" shellenv zsh)"
+  upsert_block "${HOME}/.zprofile" "homebrew" "$zsh_shellenv"
+  remove_exact_line "${HOME}/.zprofile" "eval \"\$(\"${BREW_PREFIX}/bin/brew\" shellenv)\""
 }
 
 install_symbola_font() {
@@ -493,13 +540,14 @@ install_node_with_fnm() {
   eval "$(fnm env --use-on-cd --shell bash)"
 
   node_version="$(fnm current 2>/dev/null || true)"
-  if [[ -z "$node_version" || "$node_version" == "system" || "$node_version" == "none" ]]; then
+  if [[ ! "$node_version" =~ ^v[0-9]+([.][0-9]+){2}$ ]]; then
     log "Installing Node.js LTS with fnm"
     fnm install --lts
+    fnm use --lts >/dev/null
     node_version="$(fnm current 2>/dev/null || true)"
   fi
 
-  if [[ -z "$node_version" || "$node_version" == "system" || "$node_version" == "none" ]]; then
+  if [[ ! "$node_version" =~ ^v[0-9]+([.][0-9]+){2}$ ]]; then
     fail "fnm did not provide a managed Node.js runtime."
   fi
 
@@ -633,13 +681,9 @@ write_zshrc_blocks() {
   upsert_block "$zshrc" "syntax-highlighting" "$syntax_hl_block"
 }
 
-write_bashrc_wsl_block() {
-  local bashrc="${HOME}/.bashrc"
-  local wsl_block
-
-  wsl_block="$(read_template "${SCRIPT_DIR}/templates/bash/wsl-zsh-handoff.sh")"
-
-  upsert_block "$bashrc" "wsl-zsh-handoff" "$wsl_block"
+write_zshenv_block() {
+  upsert_block "${HOME}/.zshenv" "startup" \
+    "$(read_template "${SCRIPT_DIR}/templates/zsh/zshenv.sh")"
 }
 
 write_starship_config() {
@@ -720,11 +764,11 @@ main() {
   install_npm_global_packages
   install_csharpier_if_dotnet_available
   install_vscode
+  install_wsl_browser
   prompt_for_git_email
+  write_zshenv_block
   write_zshrc_blocks
-  if [[ "$IS_WSL" -eq 1 ]]; then
-    write_bashrc_wsl_block
-  fi
+  remove_block "${HOME}/.bashrc" "wsl-zsh-handoff"
   write_starship_config
   if [[ "$OS" == "macos" || "$IS_WSL" -eq 0 ]]; then
     write_ghostty_config

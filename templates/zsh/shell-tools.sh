@@ -1,14 +1,67 @@
 # fnm
-if command -v fnm >/dev/null 2>&1; then
-  eval "$(fnm env --use-on-cd --shell zsh)"
-  _fnm_current="$(fnm current 2>/dev/null || true)"
-  if [[ -z "$_fnm_current" || "$_fnm_current" == "system" || "$_fnm_current" == "none" ]]; then
-    if fnm install --lts >/dev/null 2>&1; then
-      fnm default "$(fnm current)" >/dev/null 2>&1
-      eval "$(fnm env --use-on-cd --shell zsh)"
-    fi
+_fnm_binary="$(command -v fnm 2>/dev/null)"
+if [[ -n "$_fnm_binary" ]]; then
+  export FNM_DIR="${FNM_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/fnm}"
+  if [[ -d "$FNM_DIR/aliases/default/bin" ]]; then
+    export PATH="$FNM_DIR/aliases/default/bin:$PATH"
   fi
-  unset _fnm_current
+
+  _fnm_lazy_commands=(
+    fnm node npm npx corepack pnpm pnpx yarn yarnpkg
+    tsc tsserver typescript-language-server
+  )
+
+  _fnm_define_lazy_wrappers() {
+    local command_name
+    for command_name in "${_fnm_lazy_commands[@]}"; do
+      functions[$command_name]='_fnm_lazy_load || return; command '"$command_name"' "$@"'
+    done
+  }
+
+  _fnm_env() {
+    if [[ -n "${XDG_RUNTIME_DIR:-}" &&
+          ( ! -d "$XDG_RUNTIME_DIR" || ! -w "$XDG_RUNTIME_DIR" ) ]]; then
+      env -u XDG_RUNTIME_DIR "$_fnm_binary" env --use-on-cd --shell zsh
+    else
+      "$_fnm_binary" env --use-on-cd --shell zsh
+    fi
+  }
+
+  _fnm_lazy_chpwd() {
+    if [[ -f .node-version || -f .nvmrc || -f package.json ]]; then
+      _fnm_lazy_load
+    fi
+  }
+
+  _fnm_lazy_load() {
+    local command_name init
+
+    if ! init="$(_fnm_env)"; then
+      print -u2 "fnm: failed to initialize"
+      return 1
+    fi
+
+    for command_name in "${_fnm_lazy_commands[@]}"; do
+      unfunction "$command_name" 2>/dev/null
+    done
+    autoload -Uz add-zsh-hook
+    add-zsh-hook -d chpwd _fnm_lazy_chpwd 2>/dev/null
+
+    if ! eval "$init"; then
+      print -u2 "fnm: failed to apply its shell environment"
+      _fnm_define_lazy_wrappers
+      add-zsh-hook chpwd _fnm_lazy_chpwd
+      return 1
+    fi
+
+    unfunction _fnm_define_lazy_wrappers _fnm_env _fnm_lazy_chpwd
+    unfunction _fnm_lazy_load
+    unset _fnm_binary _fnm_lazy_commands
+  }
+
+  _fnm_define_lazy_wrappers
+  autoload -Uz add-zsh-hook
+  add-zsh-hook chpwd _fnm_lazy_chpwd
 fi
 
 # zoxide
@@ -21,14 +74,14 @@ export FZF_DEFAULT_COMMAND='fd --type f --hidden --exclude .git'
 export FZF_CTRL_T_COMMAND="$FZF_DEFAULT_COMMAND"
 export FZF_ALT_C_COMMAND='fd --type d --hidden --exclude .git'
 export BAT_THEME='GitHub'
-export FZF_DEFAULT_OPTS='--height 40% --layout=reverse --border --preview "bat --theme=GitHub --style=numbers --color=always --line-range :200 {}"'
+export FZF_DEFAULT_OPTS='--height 40% --layout=reverse --border --preview '\''if [[ -d {} ]]; then eza --tree --level=2 --color=always {}; else bat --theme=GitHub --style=numbers --color=always --line-range :200 {}; fi'\'''
 
 if [[ -f "${HOMEBREW_PREFIX:-}/opt/fzf/shell/key-bindings.zsh" ]]; then
-  source "${HOMEBREW_PREFIX}/opt/fzf/shell/key-bindings.zsh"
+  _zsh_cache_source "${HOMEBREW_PREFIX}/opt/fzf/shell/key-bindings.zsh" fzf-key-bindings
 fi
 
 if [[ -f "${HOMEBREW_PREFIX:-}/opt/fzf/shell/completion.zsh" ]]; then
-  source "${HOMEBREW_PREFIX}/opt/fzf/shell/completion.zsh"
+  _zsh_cache_source "${HOMEBREW_PREFIX}/opt/fzf/shell/completion.zsh" fzf-completion
 fi
 
 if [[ -o interactive && -z "${ZSH_NONINTERACTIVE_SAFE:-}" ]]; then
@@ -56,46 +109,8 @@ if [[ -o interactive && -z "${ZSH_NONINTERACTIVE_SAFE:-}" ]]; then
     alias pbcopy='clip.exe'
     alias pbpaste='powershell.exe -NoProfile -Command Get-Clipboard'
     open() { explorer.exe "${1:-.}"; }
-    # Route xdg-open / $BROWSER at a Windows browser binary via a wrapper.
-    # Why a wrapper:
-    #   1. wslu / wslview invoke explorer.exe directly, which (when the WSL
-    #      cwd is a Linux/UNC path) pops a spurious Explorer window at
-    #      ~/Documents on the Windows side.
-    #   2. sensible-browser does `eval "$BROWSER \"$@\""`, so $BROWSER set
-    #      to a path containing spaces or `(x86)` blows up with a syntax
-    #      error and falls back to x-www-browser -> wslview anyway.
-    # The wrapper has no spaces in its name and probes Edge -> Chrome ->
-    # wslview internally. We also symlink it as `xdg-open` so .NET's
-    # Process.Start(url, UseShellExecute=true) picks it up (it looks for
-    # xdg-open / gnome-open / kfmclient on PATH; MSAL.NET uses this for
-    # interactive auth).
+    # Provisioned by ~/bootstrap so shell startup only selects the browser.
     _wsl_browser="$HOME/.local/bin/wsl-browser"
-    if [[ ! -x "$_wsl_browser" ]]; then
-      mkdir -p "$HOME/.local/bin"
-      cat > "$_wsl_browser" <<'WSL_BROWSER_EOF'
-#!/bin/sh
-# wsl-browser: open URLs in a Windows browser without going through
-# explorer.exe. Managed by ~/bootstrap; safe to regenerate.
-for candidate in \
-  "/mnt/c/Program Files (x86)/Microsoft/Edge/Application/msedge.exe" \
-  "/mnt/c/Program Files/Microsoft/Edge/Application/msedge.exe" \
-  "/mnt/c/Program Files/Google/Chrome/Application/chrome.exe"
-do
-  if [ -x "$candidate" ]; then
-    exec "$candidate" "$@"
-  fi
-done
-if command -v wslview >/dev/null 2>&1; then
-  exec wslview "$@"
-fi
-echo "wsl-browser: no Windows browser found and wslview not installed" >&2
-exit 127
-WSL_BROWSER_EOF
-      chmod +x "$_wsl_browser"
-    fi
-    if [[ -x "$_wsl_browser" ]] && [[ ! -e "$HOME/.local/bin/xdg-open" ]]; then
-      ln -s "$_wsl_browser" "$HOME/.local/bin/xdg-open"
-    fi
     if [[ -x "$_wsl_browser" ]]; then
       export BROWSER="$_wsl_browser"
     elif command -v wslview >/dev/null 2>&1; then

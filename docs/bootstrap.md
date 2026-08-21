@@ -115,6 +115,10 @@ The bootstrap writes managed blocks into:
 
 Those blocks are sourced from tracked files under `templates/`.
 
+Shell startup uses static Homebrew exports, cached Starship and GitHub CLI
+initialization, compiled zsh completion/plugin files, and lazy `fnm`
+initialization to keep new terminal tabs responsive.
+
 ## Git and JJ Setup
 
 The bootstrap configures:

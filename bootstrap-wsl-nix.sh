@@ -20,6 +20,18 @@ command_exists() {
   command -v "$1" >/dev/null 2>&1
 }
 
+install_wsl_browser() {
+  local local_bin="${HOME}/.local/bin"
+  local browser="${local_bin}/wsl-browser"
+  local xdg_open="${local_bin}/xdg-open"
+
+  mkdir -p "$local_bin"
+  install -m 0755 "${SCRIPT_DIR}/templates/wsl-browser" "$browser"
+  if [[ ! -e "$xdg_open" && ! -L "$xdg_open" ]]; then
+    ln -s "$browser" "$xdg_open"
+  fi
+}
+
 read_template() {
   local template_path="$1"
 
@@ -81,6 +93,27 @@ upsert_block() {
       }
     ' "$file" >"$tmp"
 
+    mv "$tmp" "$file"
+  ) 9>"${file}.lock"
+}
+
+remove_block() {
+  local file="$1"
+  local name="$2"
+  local start="# >>> ${SCRIPT_MARKER}:${name}"
+  local end="# <<< ${SCRIPT_MARKER}:${name}"
+  local tmp
+
+  [[ -f "$file" ]] || return
+  tmp="$(mktemp)" || fail "Failed to create temporary file"
+
+  (
+    flock -x 9 || fail "Failed to acquire lock on ${file}"
+    awk -v start="$start" -v end="$end" '
+      $0 == start { in_block = 1; next }
+      $0 == end { in_block = 0; next }
+      !in_block { print }
+    ' "$file" >"$tmp"
     mv "$tmp" "$file"
   ) 9>"${file}.lock"
 }
@@ -339,12 +372,6 @@ write_zshrc_blocks() {
   upsert_block "$zshrc" "syntax-highlighting" "$(read_template "${SCRIPT_DIR}/templates/zsh/syntax-highlighting.sh")"
 }
 
-write_bashrc_wsl_block() {
-  local bashrc="${HOME}/.bashrc"
-  upsert_block "$bashrc" "wsl-zsh-handoff" \
-    "$(read_template "${SCRIPT_DIR}/templates/bash/wsl-zsh-handoff.sh")"
-}
-
 write_starship_config() {
   local starship_config="${HOME}/.config/starship.toml"
   upsert_block "$starship_config" "config" "$(read_template "${SCRIPT_DIR}/templates/starship.toml")"
@@ -439,9 +466,10 @@ main() {
   source_nix
   install_dev_tools
   register_nix_profile_fonts
+  install_wsl_browser
   prompt_for_git_email
   write_zshrc_blocks
-  write_bashrc_wsl_block
+  remove_block "${HOME}/.bashrc" "wsl-zsh-handoff"
   write_starship_config
   configure_git
   write_jj_config

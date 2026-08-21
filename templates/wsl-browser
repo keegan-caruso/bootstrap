@@ -1,0 +1,35 @@
+#!/bin/sh
+# Open URLs in a Windows browser without routing through explorer.exe.
+
+case "${1:-}" in
+  --help|-h)
+    echo "Usage: xdg-open URL"
+    exit 0
+    ;;
+  --version)
+    echo "wsl-browser 1.0"
+    exit 0
+    ;;
+esac
+
+if [ "$#" -eq 0 ]; then
+  echo "Usage: xdg-open URL" >&2
+  exit 1
+fi
+
+for candidate in \
+  "/mnt/c/Program Files (x86)/Microsoft/Edge/Application/msedge.exe" \
+  "/mnt/c/Program Files/Microsoft/Edge/Application/msedge.exe" \
+  "/mnt/c/Program Files/Google/Chrome/Application/chrome.exe"
+do
+  if [ -x "$candidate" ]; then
+    exec "$candidate" "$@"
+  fi
+done
+
+if command -v wslview >/dev/null 2>&1; then
+  exec wslview "$@"
+fi
+
+echo "wsl-browser: no Windows browser found and wslview not installed" >&2
+exit 127
