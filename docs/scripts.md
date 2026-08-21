@@ -10,6 +10,7 @@ Main machine bootstrap. It handles:
 - CLI package installation
 - Node.js installation through `fnm`
 - fallback global npm packages
+- side-by-side .NET SDK 8 and 10 installation
 - VS Code installation or WSL launcher setup
 - shell, prompt, Ghostty, and JJ config generation
 - Git configuration

@@ -55,6 +55,10 @@ NPM_GLOBAL_PACKAGES=(
   typescript
   typescript-language-server
 )
+DOTNET_SDK_CHANNELS=(
+  8.0
+  10.0
+)
 
 log() {
   printf '[setup] %s\n' "$*"
@@ -371,7 +375,23 @@ remove_exact_line() {
 install_ubuntu_base() {
   log "Installing Ubuntu base packages"
   sudo apt-get update
-  sudo apt-get install -y build-essential procps curl file git zsh unzip fontconfig gpg
+  sudo apt-get install -y \
+    build-essential \
+    procps \
+    curl \
+    file \
+    git \
+    zsh \
+    unzip \
+    fontconfig \
+    gpg \
+    libc6 \
+    libgcc-s1 \
+    libgssapi-krb5-2 \
+    libicu-dev \
+    libssl-dev \
+    libstdc++6 \
+    zlib1g
 }
 
 install_secure_credential_storage() {
@@ -571,17 +591,48 @@ install_npm_global_packages() {
   npm install -g "${NPM_GLOBAL_PACKAGES[@]}"
 }
 
-install_csharpier_if_dotnet_available() {
-  if ! command_exists dotnet; then
-    return
-  fi
+install_dotnet_sdks() {
+  local dotnet_root="${DOTNET_ROOT:-${HOME}/.dotnet}"
+  local installer_dir="${XDG_CACHE_HOME:-${HOME}/.cache}/${SCRIPT_MARKER}"
+  local installer="${installer_dir}/dotnet-install.sh"
+  local installer_temp="${installer}.tmp"
+  local channel
+  local installed_sdks
 
-  log "Installing csharpier .NET tool"
+  log "Installing .NET SDKs ${DOTNET_SDK_CHANNELS[*]}"
+  mkdir -p "$dotnet_root" "$installer_dir"
+  if ! curl --proto '=https' --tlsv1.2 -fsSL \
+    https://dot.net/v1/dotnet-install.sh -o "$installer_temp"; then
+    rm -f "$installer_temp"
+    fail "Failed to download the .NET installer."
+  fi
+  mv "$installer_temp" "$installer"
+
+  for channel in "${DOTNET_SDK_CHANNELS[@]}"; do
+    bash "$installer" \
+      --channel "$channel" \
+      --install-dir "$dotnet_root" \
+      --no-path
+  done
+
+  export DOTNET_ROOT="$dotnet_root"
+  export PATH="${DOTNET_ROOT}:${DOTNET_ROOT}/tools:${PATH}"
+  installed_sdks="$(dotnet --list-sdks)"
+
+  for channel in "${DOTNET_SDK_CHANNELS[@]}"; do
+    if ! grep -Eq "^${channel//./\\.}[.]" <<<"$installed_sdks"; then
+      fail ".NET SDK ${channel} was not installed successfully."
+    fi
+  done
+}
+
+install_csharpier() {
+  log "Installing CSharpier .NET tool"
   if dotnet tool update -g csharpier >/dev/null 2>&1 || dotnet tool install -g csharpier >/dev/null 2>&1; then
     mkdir -p "${HOME}/.local/bin"
     ln -sf "${HOME}/.dotnet/tools/csharpier" "${HOME}/.local/bin/csharpier"
   else
-    log "Skipping csharpier: dotnet tool install failed"
+    log "Skipping CSharpier: dotnet tool installation failed"
   fi
 }
 
@@ -762,7 +813,8 @@ main() {
   setup_brew_env
   install_brew_packages
   install_npm_global_packages
-  install_csharpier_if_dotnet_available
+  install_dotnet_sdks
+  install_csharpier
   install_vscode
   install_wsl_browser
   prompt_for_git_email

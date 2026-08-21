@@ -7,6 +7,10 @@
     let
       system = "x86_64-linux";
       pkgs = nixpkgs.legacyPackages.${system};
+      dotnetSdk = pkgs.dotnetCorePackages.combinePackages [
+        pkgs.dotnetCorePackages.sdk_8_0
+        pkgs.dotnetCorePackages.sdk_10_0
+      ];
 
       # Minimal in-tree replacement for `wslview` (from the archived `wslu`
       # project, which was removed from nixpkgs). Behaves well enough for
@@ -86,6 +90,7 @@
         markdownlint-cli2
 
         # languages / linters
+        dotnetSdk
         rust-analyzer
         shellcheck
         shfmt

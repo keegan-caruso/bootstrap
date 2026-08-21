@@ -80,6 +80,9 @@ adds a `<dir>` entry to `~/.config/fontconfig/fonts.conf` and runs
 `fc-cache` so the fonts are visible to `fc-list`, Ghostty, Windows
 Terminal (via WSL), etc.
 
+The flake combines the .NET 8 and 10 SDK packages so both SDK lines are
+available through the same `dotnet` command.
+
 Out of scope for this script (handle separately if needed):
 
 - VS Code launcher (`~/.local/bin/code` wrapper)

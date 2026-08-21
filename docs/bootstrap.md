@@ -17,6 +17,7 @@ The script installs and configures:
   `duf`, `bottom`, `procs`, `ncdu`, `xh`, `doggo`
 - JavaScript toolchain support through `fnm`, Node.js LTS, Corepack,
   `prettier`, `eslint_d`
+- .NET SDK 8 and 10 installed side-by-side, plus `csharpier`
 - Python support through `uv`, `ruff`, and `ty`
 - Rust support through `rust-analyzer`
 - TOML support through `taplo`
@@ -140,8 +141,11 @@ On WSL it also sets:
 JJ config is generated from `templates/jj/config.toml.tmpl` using the same
 Git identity values.
 
-If `dotnet` is already installed, the bootstrap also installs `csharpier` as a
-global .NET tool and exposes it through `~/.local/bin`.
+The bootstrap installs the latest SDK from the .NET 8 and 10 channels
+side-by-side under `${DOTNET_ROOT:-$HOME/.dotnet}`. It also installs
+`csharpier` as a global .NET tool and exposes it through `~/.local/bin`.
+On Ubuntu, the base package installation includes the native libraries
+required by Microsoft-provided .NET SDK archives.
 
 ## Recommended Windows-side `.wslconfig` (WSL only)
 
