@@ -61,14 +61,15 @@ upsert_block() {
 
   (
     flock -x 9 || fail "Failed to acquire lock on ${file}"
-    awk -v start="$start" -v end="$end" -v block="$content" '
+    # Environment values avoid awk interpreting backslash escapes from templates.
+    BLOCK_CONTENT="$content" awk -v start="$start" -v end="$end" '
       BEGIN {
         in_block = 0
         replaced = 0
       }
       $0 == start {
         print start
-        print block
+        print ENVIRON["BLOCK_CONTENT"]
         print end
         in_block = 1
         replaced = 1
@@ -87,7 +88,7 @@ upsert_block() {
             print ""
           }
           print start
-          print block
+          print ENVIRON["BLOCK_CONTENT"]
           print end
         }
       }
