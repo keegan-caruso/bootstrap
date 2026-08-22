@@ -562,8 +562,7 @@ install_node_with_fnm() {
   node_version="$(fnm current 2>/dev/null || true)"
   if [[ ! "$node_version" =~ ^v[0-9]+([.][0-9]+){2}$ ]]; then
     log "Installing Node.js LTS with fnm"
-    fnm install --lts
-    fnm use --lts >/dev/null
+    fnm install --lts --use
     node_version="$(fnm current 2>/dev/null || true)"
   fi
 

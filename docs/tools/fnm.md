@@ -8,7 +8,7 @@ entering a directory with `.node-version`, `.nvmrc`, or `package.json`.
 
 ## Common Commands
 
-- `fnm install --lts`: install the current Node.js LTS
-- `fnm use --lts`: use the current LTS in this shell
+- `fnm install --lts --use`: install and use the current Node.js LTS
+- `fnm use <version>`: use an installed Node.js version in this shell
 - `fnm default <version>`: set the default Node version
 - `fnm list`: list installed Node versions
