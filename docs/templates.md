@@ -12,6 +12,7 @@ blocks into user config files.
 - `templates/zsh/syntax-highlighting.sh`
 - `templates/bash/aliases.sh`
 - `templates/starship.toml`
+- `templates/typescript-language-server`
 - `templates/ghostty/config`
 - `templates/jj/config.toml.tmpl`
 
@@ -24,6 +25,7 @@ blocks into user config files.
 - `templates/zsh/syntax-highlighting.sh` -> managed syntax-highlighting block in `~/.zshrc`
 - `templates/bash/aliases.sh` -> managed alias block in `~/.bashrc`
 - `templates/starship.toml` -> managed block in `~/.config/starship.toml`
+- `templates/typescript-language-server` -> `~/.local/bin/typescript-language-server`
 - `templates/ghostty/config` -> managed block in `~/.config/ghostty/config`
 - `templates/jj/config.toml.tmpl` -> rendered into `~/.config/jj/config.toml`
 

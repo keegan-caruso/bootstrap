@@ -5,6 +5,7 @@ This repo is a personal bootstrap for a terminal-first development environment.
 Use these docs as the main reference:
 
 - [bootstrap.md](bootstrap.md): machine bootstrap behavior and installed tooling
+- [nix.md](nix.md): flake outputs, updates, and rollback
 - [scripts.md](scripts.md): purpose and usage of each top-level script
 - [templates.md](templates.md): tracked shell and config templates copied by
   the bootstrap
@@ -12,7 +13,7 @@ Use these docs as the main reference:
 
 ## Repo Layout
 
-- `bootstrap-dev-shell.sh`: main bootstrap script
+- `bootstrap-nix.sh`: main bootstrap script
 - `configure-zellij.sh`: writes `~/.config/zellij/config.kdl`
 - `launch-wt-wsl.ps1`: launches Windows Terminal into WSL
 - `templates/`: shell and app config templates read by the bootstrap

@@ -3,179 +3,93 @@
 The main bootstrap entry point is:
 
 ```bash
-./bootstrap-dev-shell.sh
+./bootstrap-nix.sh
 ```
 
-## What It Installs
+`bootstrap-dev-shell.sh` and `bootstrap-wsl-nix.sh` are compatibility wrappers
+for the same command.
 
-The script installs and configures:
+## Package ownership
 
-- Homebrew
-- core CLI tools such as `fd`, `rg`, `bat`, `eza`, `git`, `gh`, `jj`,
-  `jq`, `zellij`, `starship`, `zsh-autosuggestions`, `zsh-syntax-highlighting`
-- utility tools such as `delta`, `zoxide`, `hyperfine`, `tokei`, `dust`,
-  `duf`, `bottom`, `procs`, `ncdu`, `xh`, `doggo`
-- JavaScript toolchain support through `fnm`, Node.js LTS, Corepack,
-  `prettier`, `eslint_d`
-- .NET SDK 8 and 10 installed side-by-side, plus `csharpier`
-- Python support through `uv`, `ruff`, and `ty`
-- Rust support through `rust-analyzer`
-- TOML support through `taplo`
-- shell and markup tooling through `shellcheck`, `shfmt`,
-  `markdownlint-cli2`, `pandoc`, `yamllint`, `yq`
-- VS Code
-- global Git and Jujutsu identity/config
-- fallback/editor fonts such as JetBrains Mono Nerd Font, Symbols Nerd Font
-  Mono, and Symbola
+Nix is the source of truth for native tools, including:
 
-The bootstrap also installs machine-level fallback npm packages:
+- shell and navigation tools such as `zsh`, `fzf`, `fd`, `bat`, `eza`,
+  `zoxide`, Starship, and Zsh plugins
+- Git, GitHub CLI, Jujutsu, Delta, and common data/markup tools
+- .NET SDK 8 and 10 plus CSharpier
+- Python tools including `uv`, `ruff`, and `ty`
+- Rust-based tools including `rust-analyzer`, `bottom`, `dust`, `taplo`,
+  `tokei`, and Zellij
+- JetBrains Mono Nerd Font, Symbols Nerd Font, and Symbola
+- Ghostty on native Linux and Apple Silicon macOS
 
-- `typescript`
-- `typescript-language-server`
+The bootstrap uses `fnm` from Nix to install Node.js LTS. npm owns the tools
+that are distributed natively through npm:
 
-These are fallbacks. The editor is designed to prefer project-local JS/TS
-tools when present.
+- `typescript@7.0.2`
+- `markdownlint-cli2`
+- `oxfmt`
+- `oxlint`
 
-## Platform Behavior
+The installed `typescript-language-server` compatibility command runs
+TypeScript 7's native `tsc --lsp` mode.
 
-### macOS
+## npm registry configuration
 
-The script:
+npm installation honors normal project, user, and global `.npmrc` files,
+including scoped registries and authentication. `NPM_CONFIG_REGISTRY` works
+normally. The bootstrap also accepts a one-run override:
 
-- uses Homebrew under `/opt/homebrew` or `/usr/local`
-- installs JetBrains Mono Nerd Font through Homebrew Casks
-- installs Symbols Nerd Font Mono through Homebrew Casks
-- installs the Symbola fallback font into `~/Library/Fonts`
-- installs Ghostty
-- installs VS Code through Homebrew Casks
+```bash
+BOOTSTRAP_NPM_REGISTRY=https://registry.example.test/ ./bootstrap-nix.sh
+```
 
-### Ubuntu
+The bootstrap confirms that npm resolved a registry without printing the URL or
+credentials.
 
-The script:
+## Supported platforms
 
-- installs a small base package set with `apt-get`
-- installs `gnome-keyring` and `libsecret` so the freedesktop Secret Service
-  is available for tools that store tokens there (e.g. the GitHub Copilot CLI
-  login), avoiding the "recommended secure storage ... is not installed" error
-- installs the rest of the CLI stack through Homebrew
-- installs VS Code through Microsoft’s apt repository
-- installs JetBrains Mono Nerd Font, Symbols Nerd Font Mono, and Symbola into
-  the user font directory
+- Ubuntu 24.04 and 26.04, including WSL
+- Apple Silicon macOS
 
-### WSL
+The pinned nixpkgs revision no longer supports Intel macOS.
 
-The script detects WSL automatically and changes behavior:
+Ubuntu uses apt only for host integration prerequisites such as CA
+certificates, the Nix installer, and Secret Service support. Development tools
+come from the pinned Nix flake.
 
-- warns if the repo lives under `/mnt/*`
-- skips Ghostty installation
-- skips `chsh`
-- uses a Windows-hosted `code` launcher instead of trying to install Linux
-  VS Code
-- writes modern CLI aliases into `.bashrc` for interactive bash sessions
-- adds Windows interop helpers through shell config
-- installs `wslu` (falling back to the upstream `wslutilities/wslu` PPA if
-  the package isn't in the configured apt sources) and installs a
-  `~/.local/bin/wsl-browser` wrapper that probes Edge → Chrome → `wslview`
-  and points `BROWSER` at it. The wrapper exists to dodge two issues:
-  (1) wslu's `wslview` invokes `explorer.exe URL`, which pops a spurious
-  Explorer window on `Documents` when the WSL cwd is a Linux/UNC path, and
-  (2) `sensible-browser` does `eval "$BROWSER ..."`, so a `$BROWSER` set
-  directly to `/mnt/c/Program Files (x86)/...` fails with a shell syntax
-  error and silently falls back to `wslview`. The block also symlinks the
-  wrapper as `~/.local/bin/xdg-open` so .NET's `Process.Start(url,
-  UseShellExecute=true)` (used by MSAL's interactive auth flow) picks it
-  up, and exports
-  `ARTIFACTS_CREDENTIALPROVIDER_MSAL_ALLOW_BROKER=false` to disable the
-  MSAL broker for `@microsoft/artifacts-npm-credprovider` — on WSL the
-  broker bridges to Windows WAM via interop and inherits the Linux/UNC
-  cwd, which also pops Explorer at `~/Documents`
-- appends an idempotent block to `/etc/gai.conf` so `getaddrinfo()` prefers
-  IPv4 over IPv6. Instead of disabling IPv6 outright, this uncomments the
-  `precedence ::ffff:0:0/96  100` rule plus the `scopev4` NAT/loopback/
-  link-local entries, which avoids long IPv6 timeouts on WSL2 when the
-  upstream network is IPv4-only while still allowing IPv6 on the local
-  link. The block is guarded by a `# codex-dev-shell: prefer IPv4 over
-  IPv6` marker so reruns don't duplicate it
-- enables systemd via `[boot] systemd = true` in `/etc/wsl.conf` so
-  `systemd-timesyncd`, user services, and modern WSL distro features work.
-  Requires `wsl --shutdown` from PowerShell for the change to take effect
-- writes `/etc/sysctl.d/99-codex-dev-shell.conf` with editor/watcher
-  defaults (`fs.inotify.max_user_watches`, `fs.inotify.max_user_instances`,
-  `vm.max_map_count`) and reloads them in-place
+WSL additionally configures systemd, editor/watch limits, browser integration,
+and Windows Git Credential Manager. It does not install Ghostty. VS Code is not
+installed or configured on any platform.
 
-## Shell and Prompt Setup
+## Configuration
 
 The bootstrap writes managed blocks into:
 
+- `~/.zshenv`
 - `~/.zshrc`
 - `~/.bashrc` on WSL
 - `~/.config/starship.toml`
-- `~/.config/ghostty/config`
+- `~/.config/ghostty/config` outside WSL
 - `~/.config/jj/config.toml`
 
-Those blocks are sourced from tracked files under `templates/`.
+Global Git configuration includes identity, Delta, `zdiff3`, fetch pruning,
+and a default `main` branch. WSL also uses Windows Git Credential Manager.
 
-Shell startup uses static Homebrew exports, cached Starship and GitHub CLI
-initialization, compiled zsh completion/plugin files, and lazy `fnm`
-initialization to keep new terminal tabs responsive.
+## Updating
 
-## Git and JJ Setup
-
-The bootstrap configures:
-
-- `user.name`
-- `user.email`
-- `delta`
-- `merge.conflictStyle=zdiff3`
-- `fetch.prune=true`
-- `init.defaultBranch=main`
-
-On WSL it also sets:
-
-- `core.fileMode=false`
-- `core.autocrlf=input`
-- `credential.helper=manager-wsl`, backed by a native
-  `~/.local/bin/git-credential-manager-wsl` wrapper
-- `credential.https://dev.azure.com.useHttpPath=true`
-- Windows GCM broker authentication through
-  `credential.msauthUseBroker=true` in the Windows Git configuration
-
-The wrapper invokes `git.exe credential-manager`, allowing Git in WSL to use
-Windows Web Account Manager without storing a Windows executable path in the
-WSL Git configuration. The Nix toolset includes the same wrapper.
-
-JJ config is generated from `templates/jj/config.toml.tmpl` using the same
-Git identity values.
-
-The bootstrap installs the latest SDK from the .NET 8 and 10 channels
-side-by-side under `${DOTNET_ROOT:-$HOME/.dotnet}`. It also installs
-`csharpier` as a global .NET tool and exposes it through `~/.local/bin`.
-On Ubuntu, the base package installation includes the native libraries
-required by Microsoft-provided .NET SDK archives.
-
-## Recommended Windows-side `.wslconfig` (WSL only)
-
-The bootstrap can only touch settings inside the Linux distro. A few
-high-impact tweaks live on the Windows host in `%USERPROFILE%\.wslconfig`
-and need to be applied manually. After editing, run `wsl --shutdown` from
-PowerShell.
-
-```ini
-[wsl2]
-# Cap memory/cpu so WSL doesn't starve the Windows host. Tune to taste.
-memory=12GB
-processors=8
-swap=4GB
-
-# Windows 11 only. Mirrors the Windows network stack into WSL so localhost,
-# VPNs, and IPv6 routes Just Work; tunnels DNS through Windows; respects
-# Windows Firewall and proxy settings.
-networkingMode=mirrored
-dnsTunneling=true
-firewall=true
-autoProxy=true
+```bash
+./update-nix.sh
 ```
 
-`networkingMode=mirrored` largely supersedes the in-distro `gai.conf`
-tweak, but the latter is still a safe belt-and-braces fallback for hosts
-that fall back to NAT networking.
+The updater refreshes `nix/flake.lock`, evaluates and builds the flake, and
+upgrades the installed profile entry.
+
+## Local checks
+
+```bash
+./test-nix.sh
+```
+
+This evaluates every supported system and builds the tool environment for the
+current machine. It does not use CI or a container runtime.

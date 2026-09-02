@@ -1,25 +1,26 @@
 # Scripts
 
-## `bootstrap-dev-shell.sh`
+## `bootstrap-nix.sh`
 
 Main machine bootstrap. It handles:
 
 - OS detection
-- Ubuntu base packages
-- Homebrew installation and environment setup
-- CLI package installation
+- Nix installation and pinned profile provisioning
+- Ubuntu 24.04/26.04 host integration
+- CLI, .NET, Python, Rust, fonts, and Ghostty through Nix
 - Node.js installation through `fnm`
-- fallback global npm packages
-- side-by-side .NET SDK 8 and 10 installation
-- VS Code installation or WSL launcher setup
+- npm-native tools using the configured npm registry
 - shell, prompt, Ghostty, and JJ config generation
 - Git configuration
 
 Run:
 
 ```bash
-./bootstrap-dev-shell.sh
+./bootstrap-nix.sh
 ```
+
+`bootstrap-dev-shell.sh` and `bootstrap-wsl-nix.sh` delegate to this command
+for compatibility.
 
 ## `configure-zellij.sh`
 
@@ -44,20 +45,31 @@ Run:
 ./configure-zellij.sh
 ```
 
-## `update-wsl-nix.sh`
+## `update-nix.sh`
 
 Updates the `nixpkgs` revision pinned by `nix/flake.lock`, checks and builds the
-updated flake, and upgrades the installed `wsl-dev-tools` profile generation.
+updated flake, and upgrades the installed development profile generation.
 It activates the installed Nix profile automatically when `nix` is not already
 on `PATH`.
 
 Run:
 
 ```bash
-./update-wsl-nix.sh
+./update-nix.sh
 ```
 
 After it succeeds, review and commit the `nix/flake.lock` change.
+
+## `test-nix.sh`
+
+Evaluates the flake for every supported system and builds the current machine's
+tool environment locally.
+
+Run:
+
+```bash
+./test-nix.sh
+```
 
 ## `launch-wt-wsl.ps1`
 
@@ -115,7 +127,7 @@ Run another command:
 ./nix-wt experiment -- zsh
 ```
 
-Run `./bootstrap-wsl-nix.sh` once on a new WSL installation before using the
+Run `./bootstrap-nix.sh` once on a new WSL installation before using the
 launcher. `nix-wt` explicitly activates the resulting Nix profile for its own
 process; normal Zsh sessions do not activate Nix through the bootstrap template.
 

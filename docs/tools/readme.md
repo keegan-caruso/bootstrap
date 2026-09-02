@@ -6,7 +6,6 @@ Excluded here:
 
 - `git`
 - `gh`
-- VS Code
 
 ## Navigation and Search
 
@@ -28,8 +27,8 @@ Excluded here:
 - [fnm](fnm.md)
 - [markdownlint-cli2](markdownlint-cli2.md)
 - [pandoc](pandoc.md)
-- [prettier](prettier.md)
-- [eslint_d](eslint_d.md)
+- [oxfmt](oxfmt.md)
+- [oxlint](oxlint.md)
 
 ## Python Tooling
 
