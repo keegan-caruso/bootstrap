@@ -58,6 +58,9 @@ Ubuntu uses apt only for host integration prerequisites such as CA
 certificates, the Nix installer, and Secret Service support. Development tools
 come from the pinned Nix flake.
 
+When Nix is absent, the bootstrap downloads the pinned Determinate Nix
+installer release and verifies its published SHA-256 digest before running it.
+
 WSL additionally configures systemd, editor/watch limits, browser integration,
 and Windows Git Credential Manager. It does not install Ghostty. VS Code is not
 installed or configured on any platform.

@@ -11,6 +11,9 @@ PROFILE_REF="path:${FLAKE_DIR}#default"
 WORKSTATION_PROFILE_REF="path:${FLAKE_DIR}#workstation"
 STATE_HOME="${XDG_STATE_HOME:-${HOME}/.local/state}"
 PROFILE_PATH="${STATE_HOME}/nix/profiles/bootstrap"
+NIX_INSTALLER_VERSION="v3.22.2"
+NIX_INSTALLER_SHA256="0e80cca5029d37eab6dd4b53515a5313f4a78b3b4e935c0b7df26e75e5d34365"
+NIX_INSTALLER_URL="https://github.com/DeterminateSystems/nix-installer/releases/download/${NIX_INSTALLER_VERSION}/nix-installer.sh"
 # shellcheck source=packages.sh
 # shellcheck disable=SC1091
 source "${SCRIPT_DIR}/packages.sh"
@@ -313,10 +316,41 @@ install_nix() {
     return
   fi
 
+  local installer
+  local actual_sha256
+
+  installer="$(mktemp)" || fail "Failed to create temporary installer file"
+
+  log "Downloading Determinate Nix installer ${NIX_INSTALLER_VERSION}"
+  if ! curl --proto '=https' --tlsv1.2 -sSfL \
+    "$NIX_INSTALLER_URL" \
+    -o "$installer"
+  then
+    rm -f "$installer"
+    fail "Failed to download Determinate Nix installer ${NIX_INSTALLER_VERSION}"
+  fi
+
+  if command_exists sha256sum; then
+    actual_sha256="$(sha256sum "$installer" | awk '{ print $1 }')"
+  elif command_exists shasum; then
+    actual_sha256="$(shasum -a 256 "$installer" | awk '{ print $1 }')"
+  else
+    rm -f "$installer"
+    fail "A SHA-256 checksum tool is required (sha256sum or shasum)"
+  fi
+
+  if [[ "$actual_sha256" != "$NIX_INSTALLER_SHA256" ]]; then
+    rm -f "$installer"
+    fail "Determinate Nix installer checksum verification failed"
+  fi
+
   log "Installing Nix (Determinate Systems installer, multi-user, flakes enabled)"
-  curl --proto '=https' --tlsv1.2 -sSf -L \
-    https://install.determinate.systems/nix \
-    | sh -s -- install --no-confirm
+  if ! sh "$installer" install --no-confirm; then
+    rm -f "$installer"
+    fail "Determinate Nix installer failed"
+  fi
+
+  rm -f "$installer"
 }
 
 source_nix() {

@@ -19,8 +19,10 @@ Supported Nix systems are `x86_64-linux`, `aarch64-linux`, and
 ./bootstrap-nix.sh
 ```
 
-The bootstrap installs Nix with the Determinate Systems installer when needed,
-then installs the appropriate flake output into a dedicated profile at
+The bootstrap installs Nix with the pinned Determinate Systems installer
+`v3.22.2` when needed. It downloads the immutable release script and verifies
+its published SHA-256 digest before execution, then installs the appropriate
+flake output into a dedicated profile at
 `${XDG_STATE_HOME:-~/.local/state}/nix/profiles/bootstrap`.
 It builds the desired output before changing the profile. Existing matching
 entries are upgraded in place; output or checkout-path migrations atomically
