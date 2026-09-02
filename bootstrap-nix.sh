@@ -4,13 +4,19 @@ set -euo pipefail
 GIT_NAME="Keegan Caruso"
 SCRIPT_MARKER="codex-dev-shell"
 IS_WSL=0
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 FLAKE_DIR="${SCRIPT_DIR}/nix"
+FLAKE_URL="path:${FLAKE_DIR}"
 PROFILE_REF="path:${FLAKE_DIR}#default"
 WORKSTATION_PROFILE_REF="path:${FLAKE_DIR}#workstation"
+STATE_HOME="${XDG_STATE_HOME:-${HOME}/.local/state}"
+PROFILE_PATH="${STATE_HOME}/nix/profiles/bootstrap"
 # shellcheck source=packages.sh
 # shellcheck disable=SC1091
 source "${SCRIPT_DIR}/packages.sh"
+# shellcheck source=lib/nix-profile.sh
+# shellcheck disable=SC1091
+source "${SCRIPT_DIR}/lib/nix-profile.sh"
 # shellcheck source=lib/language-tools.sh
 # shellcheck disable=SC1091
 source "${SCRIPT_DIR}/lib/language-tools.sh"
@@ -339,38 +345,99 @@ source_nix() {
 
 install_dev_tools() {
   local profile_ref="$PROFILE_REF"
-  local profile_store_paths
+  local current_system
+  local desired_attr
+  local output_name
 
   if [[ "$IS_WSL" -eq 0 ]]; then
     profile_ref="$WORKSTATION_PROFILE_REF"
   fi
 
-  profile_store_paths="$(
-    nix profile list | awk -v url="path:${FLAKE_DIR}" '
+  output_name="${profile_ref##*#}"
+  current_system="$(nix eval --impure --raw --expr builtins.currentSystem)"
+  desired_attr="packages.${current_system}.${output_name}"
+
+  log "Building development tools from ${profile_ref}"
+  nix build --no-link "$profile_ref"
+
+  mkdir -p "$(dirname "$PROFILE_PATH")"
+  update_dev_tools_profile "$profile_ref" "$desired_attr"
+  export PATH="${PROFILE_PATH}/bin:${PATH}"
+}
+
+update_dev_tools_profile() (
+  local profile_ref="$1"
+  local desired_attr="$2"
+  local profile_entries=""
+  local staging_profile=""
+  local status=0
+
+  acquire_nix_profile_lock "$PROFILE_PATH"
+  trap 'exit 129' HUP
+  trap 'exit 130' INT
+  trap 'exit 143' TERM
+  trap '
+    status=$?
+    [[ -z "$staging_profile" ]] || remove_profile_links "$staging_profile"
+    release_nix_profile_lock
+    exit "$status"
+  ' EXIT
+
+  remove_abandoned_profile_staging "$PROFILE_PATH"
+  if [[ -e "$PROFILE_PATH" || -L "$PROFILE_PATH" ]]; then
+    profile_entries="$(
+      nix profile list --profile "$PROFILE_PATH" | awk '
+        /^Flake attribute:/ { attr = $3 }
+        /^Original flake URL:/ {
+          url = $0
+          sub(/^Original flake URL:[[:space:]]*/, "", url)
+          print attr "\t" url
+        }
+      '
+    )"
+  fi
+
+  if [[ "$profile_entries" == "${desired_attr}"$'\t'"${FLAKE_URL}" ]]; then
+    log "Atomically upgrading the bootstrap Nix profile"
+    nix profile upgrade --profile "$PROFILE_PATH" --all
+  else
+    staging_profile="${PROFILE_PATH}.staging.$$"
+    remove_profile_links "$staging_profile"
+    log "Building a replacement bootstrap Nix profile"
+    if ! nix profile add --profile "$staging_profile" "$profile_ref"; then
+      return 1
+    fi
+    if ! nix-env --profile "$PROFILE_PATH" --set "$staging_profile"; then
+      return 1
+    fi
+  fi
+)
+
+remove_legacy_profile_entries() {
+  local legacy_store_path
+  local legacy_store_paths
+
+  legacy_store_paths="$(
+    nix profile list 2>/dev/null | awk -v url="path:${FLAKE_DIR}" '
       /^Original flake URL:/ { matches = ($4 == url) }
       matches && /^Store paths:/ {
         for (i = 3; i <= NF; i++) print $i
       }
     '
   )"
-  if [[ -n "$profile_store_paths" ]]; then
-    log "Replacing existing Nix profile entry"
-    while IFS= read -r profile_store_path; do
-      nix profile remove "$profile_store_path"
-    done <<<"$profile_store_paths"
-  fi
-
-  log "Installing development tools from ${profile_ref}"
-  nix profile add "$profile_ref"
-  export PATH="${HOME}/.nix-profile/bin:${PATH}"
+  while IFS= read -r legacy_store_path; do
+    [[ -n "$legacy_store_path" ]] || continue
+    log "Removing legacy shared-profile entry"
+    nix profile remove "$legacy_store_path"
+  done <<<"$legacy_store_paths"
 }
 
 register_nix_profile_fonts() {
   if [[ "$OS" == "macos" ]]; then
     local mac_fonts="${HOME}/Library/Fonts/Nix"
-    [[ -d "${HOME}/.nix-profile/share/fonts" ]] || return
+    [[ -d "${PROFILE_PATH}/share/fonts" ]] || return
     mkdir -p "$mac_fonts"
-    find -L "${HOME}/.nix-profile/share/fonts" -type f \
+    find -L "${PROFILE_PATH}/share/fonts" -type f \
       \( -name '*.otf' -o -name '*.ttf' \) \
       -exec cp -f {} "$mac_fonts/" \;
     return
@@ -378,7 +445,7 @@ register_nix_profile_fonts() {
 
   local fonts_conf_dir="${HOME}/.config/fontconfig"
   local fonts_conf="${fonts_conf_dir}/fonts.conf"
-  local profile_fonts="${HOME}/.nix-profile/share/fonts"
+  local profile_fonts="${PROFILE_PATH}/share/fonts"
   local snippet
   local marker_start="<!-- >>> ${SCRIPT_MARKER}:nix-profile-fonts -->"
   local marker_end="<!-- <<< ${SCRIPT_MARKER}:nix-profile-fonts -->"
@@ -428,11 +495,11 @@ EOF
 
 link_nix_apps() {
   [[ "$OS" == "macos" ]] || return
-  [[ -d "${HOME}/.nix-profile/Applications" ]] || return
+  [[ -d "${PROFILE_PATH}/Applications" ]] || return
 
   local app
   mkdir -p "${HOME}/Applications"
-  for app in "${HOME}/.nix-profile/Applications/"*.app; do
+  for app in "${PROFILE_PATH}/Applications/"*.app; do
     [[ -e "$app" ]] || continue
     ln -sfn "$app" "${HOME}/Applications/${app##*/}"
   done
@@ -580,6 +647,7 @@ main() {
   write_ghostty_config
   configure_git
   write_jj_config
+  remove_legacy_profile_entries
 
   log "Nix bootstrap complete"
   log "Open a new shell or run: source ~/.zshrc"

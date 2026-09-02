@@ -83,7 +83,7 @@ and a default `main` branch. WSL also uses Windows Git Credential Manager.
 ```
 
 The updater refreshes `nix/flake.lock`, evaluates and builds the flake, and
-upgrades the installed profile entry.
+atomically upgrades the dedicated bootstrap profile.
 
 ## Local checks
 

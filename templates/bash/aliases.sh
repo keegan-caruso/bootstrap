@@ -1,6 +1,8 @@
 # shellcheck shell=bash
 
-export PATH="$HOME/.nix-profile/bin:$HOME/.local/bin:$PATH"
+_nix_bootstrap_profile="${XDG_STATE_HOME:-$HOME/.local/state}/nix/profiles/bootstrap"
+export PATH="$_nix_bootstrap_profile/bin:$HOME/.local/bin:$PATH"
+unset _nix_bootstrap_profile
 
 # Modern CLI aliases
 alias grep='rg'

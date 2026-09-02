@@ -3,7 +3,7 @@ _starship_command="$(command -v starship 2>/dev/null)"
 if [[ -n "$_starship_command" ]]; then
   _starship_cache_file="${_zsh_startup_cache_dir}/starship.zsh"
   _starship_identity_file="${_starship_cache_file}.command"
-  _starship_command_identity="${_starship_command:A}"
+  _starship_command_identity="${_starship_command}|${_starship_command:A}"
   _starship_cached_identity=""
   if [[ -r "$_starship_identity_file" ]]; then
     _starship_cached_identity="$(<"$_starship_identity_file")"

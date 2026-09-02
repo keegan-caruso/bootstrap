@@ -20,7 +20,11 @@ Supported Nix systems are `x86_64-linux`, `aarch64-linux`, and
 ```
 
 The bootstrap installs Nix with the Determinate Systems installer when needed,
-then installs the appropriate flake output into the user profile.
+then installs the appropriate flake output into a dedicated profile at
+`${XDG_STATE_HOME:-~/.local/state}/nix/profiles/bootstrap`.
+It builds the desired output before changing the profile. Existing matching
+entries are upgraded in place; output or checkout-path migrations atomically
+switch to a complete replacement generation.
 
 ## Update
 
@@ -33,8 +37,9 @@ After a successful update, review and commit `nix/flake.lock`.
 ## Roll back
 
 ```bash
-nix profile history
-nix profile rollback
+profile="${XDG_STATE_HOME:-$HOME/.local/state}/nix/profiles/bootstrap"
+nix profile history --profile "$profile"
+nix profile rollback --profile "$profile"
 ```
 
 ## Temporary development shell

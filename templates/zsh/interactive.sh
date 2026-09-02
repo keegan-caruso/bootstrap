@@ -133,15 +133,16 @@ if [[ -o interactive && -z "${ZSH_NONINTERACTIVE_SAFE:-}" ]]; then
   zstyle ':completion:*' matcher-list 'm:{a-zA-Z}={A-Za-z}'
 
   # zsh-autosuggestions
+  _nix_bootstrap_profile="${XDG_STATE_HOME:-$HOME/.local/state}/nix/profiles/bootstrap"
   for _zsh_autosuggestions in \
-    "$HOME/.nix-profile/share/zsh-autosuggestions/zsh-autosuggestions.zsh" \
+    "$_nix_bootstrap_profile/share/zsh-autosuggestions/zsh-autosuggestions.zsh" \
     /usr/share/zsh-autosuggestions/zsh-autosuggestions.zsh
   do
     if _zsh_cache_source "$_zsh_autosuggestions" zsh-autosuggestions; then
       break
     fi
   done
-  unset _zsh_autosuggestions
+  unset _nix_bootstrap_profile _zsh_autosuggestions
 
   if [[ -n "$_gh_command" && -s "$_gh_completion_file" ]]; then
     _zsh_compile_file "$_gh_completion_file"

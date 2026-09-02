@@ -1,7 +1,8 @@
 # zsh-syntax-highlighting (must be sourced last)
 if [[ -o interactive && -z "${ZSH_NONINTERACTIVE_SAFE:-}" ]]; then
+  _nix_bootstrap_profile="${XDG_STATE_HOME:-$HOME/.local/state}/nix/profiles/bootstrap"
   for _zsh_syntax_highlighting in \
-    "$HOME/.nix-profile/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh" \
+    "$_nix_bootstrap_profile/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh" \
     /usr/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
   do
     if [[ -d "${_zsh_syntax_highlighting:h}/highlighters" ]]; then
@@ -11,7 +12,7 @@ if [[ -o interactive && -z "${ZSH_NONINTERACTIVE_SAFE:-}" ]]; then
       break
     fi
   done
-  unset _zsh_syntax_highlighting
+  unset _nix_bootstrap_profile _zsh_syntax_highlighting
 fi
 
 unfunction _zsh_cache_source _zsh_compile_file 2>/dev/null

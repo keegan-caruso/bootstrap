@@ -77,13 +77,15 @@ export FZF_ALT_C_COMMAND='fd --type d --hidden --exclude .git'
 export BAT_THEME='GitHub'
 export FZF_DEFAULT_OPTS='--height 40% --layout=reverse --border --preview '\''if [[ -d {} ]]; then eza --tree --level=2 --color=always {}; else bat --theme=GitHub --style=numbers --color=always --line-range :200 {}; fi'\'''
 
-if [[ -f "$HOME/.nix-profile/share/fzf/key-bindings.zsh" ]]; then
-  _zsh_cache_source "$HOME/.nix-profile/share/fzf/key-bindings.zsh" fzf-key-bindings
+_nix_bootstrap_profile="${XDG_STATE_HOME:-$HOME/.local/state}/nix/profiles/bootstrap"
+if [[ -f "$_nix_bootstrap_profile/share/fzf/key-bindings.zsh" ]]; then
+  _zsh_cache_source "$_nix_bootstrap_profile/share/fzf/key-bindings.zsh" fzf-key-bindings
 fi
 
-if [[ -f "$HOME/.nix-profile/share/fzf/completion.zsh" ]]; then
-  _zsh_cache_source "$HOME/.nix-profile/share/fzf/completion.zsh" fzf-completion
+if [[ -f "$_nix_bootstrap_profile/share/fzf/completion.zsh" ]]; then
+  _zsh_cache_source "$_nix_bootstrap_profile/share/fzf/completion.zsh" fzf-completion
 fi
+unset _nix_bootstrap_profile
 
 if [[ -o interactive && -z "${ZSH_NONINTERACTIVE_SAFE:-}" ]]; then
   alias ff='fd --type f --hidden --exclude .git | fzf'
