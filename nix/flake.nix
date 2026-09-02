@@ -12,6 +12,31 @@
         pkgs.dotnetCorePackages.sdk_10_0
       ];
 
+      gcmWsl = pkgs.writeShellApplication {
+        name = "git-credential-manager-wsl";
+        text = ''
+          if ! command -v git.exe >/dev/null 2>&1; then
+            echo "git-credential-manager-wsl: Git for Windows is not available on PATH" >&2
+            exit 1
+          fi
+
+          exec git.exe credential-manager "$@"
+        '';
+      };
+
+      agency = pkgs.writeShellApplication {
+        name = "agency";
+        text = ''
+          agency_bin="$HOME/.config/agency/CurrentVersion/agency"
+          if [[ ! -x "$agency_bin" ]]; then
+            echo "agency: executable not found: $agency_bin" >&2
+            exit 1
+          fi
+
+          exec "$agency_bin" "$@"
+        '';
+      };
+
       # Minimal in-tree replacement for `wslview` (from the archived `wslu`
       # project, which was removed from nixpkgs). Behaves well enough for
       # `$BROWSER=wslview` and `xdg-open URL` use:
@@ -74,6 +99,11 @@
         gh
         jujutsu
         delta
+        gcmWsl
+
+        # isolated agent filesystems
+        fuse-overlayfs
+        util-linux
 
         # data / structured text
         jq
@@ -141,7 +171,7 @@
 
       # `nix develop` users get the same toolset plus the BROWSER hint.
       devShells.${system}.default = pkgs.mkShell {
-        packages = cliTools ++ fonts;
+        packages = cliTools ++ fonts ++ [ agency ];
         shellHook = ''
           export BROWSER=wslview
         '';

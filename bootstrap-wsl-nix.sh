@@ -373,6 +373,11 @@ write_zshrc_blocks() {
   upsert_block "$zshrc" "syntax-highlighting" "$(read_template "${SCRIPT_DIR}/templates/zsh/syntax-highlighting.sh")"
 }
 
+write_bashrc_blocks() {
+  upsert_block "${HOME}/.bashrc" "aliases" \
+    "$(read_template "${SCRIPT_DIR}/templates/bash/aliases.sh")"
+}
+
 write_starship_config() {
   local starship_config="${HOME}/.config/starship.toml"
   upsert_block "$starship_config" "config" "$(read_template "${SCRIPT_DIR}/templates/starship.toml")"
@@ -391,28 +396,28 @@ prompt_for_git_email() {
   done
 }
 
-find_windows_credential_manager() {
-  local paths=(
-    "/mnt/c/Program Files/Git/mingw64/bin/git-credential-manager.exe"
-    "/mnt/c/Program Files/Git/mingw64/libexec/git-core/git-credential-manager.exe"
-    "/mnt/c/Program Files (x86)/Git/mingw64/bin/git-credential-manager.exe"
-    "/mnt/c/Program Files/Git/mingw64/libexec/git-core/git-credential-manager-core.exe"
-  )
+configure_gcm_wsl_credential_helper() {
+  local host key
+  local helper="${HOME}/.local/bin/git-credential-manager-wsl"
 
-  local candidate
-  for candidate in "${paths[@]}"; do
-    if [[ -x "$candidate" ]]; then
-      printf '%s\n' "$candidate"
-      return
+  command_exists git.exe \
+    || fail "Git for Windows is required for brokered Git authentication."
+
+  mkdir -p "${HOME}/.local/bin"
+  install -m 0755 "${SCRIPT_DIR}/templates/git-credential-manager-wsl" "$helper"
+
+  git config --global credential.helper manager-wsl
+  for host in github.com gist.github.com; do
+    key="credential.https://${host}.helper"
+    if git config --global --get-all "$key" >/dev/null; then
+      git config --global --unset-all "$key"
     fi
   done
 
-  if command_exists git-credential-manager.exe; then
-    command -v git-credential-manager.exe
-    return
-  fi
+  git config --global credential.https://dev.azure.com.useHttpPath true
+  git.exe config --global credential.msauthUseBroker true
 
-  return 1
+  log "Git credential helper set to Windows GCM through the native WSL wrapper"
 }
 
 configure_git() {
@@ -430,14 +435,7 @@ configure_git() {
   git config --global init.defaultBranch main
   git config --global core.fileMode false
   git config --global core.autocrlf input
-
-  local gcm_path
-  if gcm_path="$(find_windows_credential_manager)"; then
-    git config --global credential.helper "\"${gcm_path}\""
-    log "Git credential helper set to Windows GCM: ${gcm_path}"
-  else
-    log "Windows Git Credential Manager not found; skipping credential.helper"
-  fi
+  configure_gcm_wsl_credential_helper
 }
 
 write_jj_config() {
@@ -471,6 +469,7 @@ main() {
   prompt_for_git_email
   write_zshrc_blocks
   remove_block "${HOME}/.bashrc" "wsl-zsh-handoff"
+  write_bashrc_blocks
   write_starship_config
   configure_git
   write_jj_config

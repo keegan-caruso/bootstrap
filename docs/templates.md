@@ -10,6 +10,7 @@ blocks into user config files.
 - `templates/zsh/prompt.sh`
 - `templates/zsh/shell-tools.sh`
 - `templates/zsh/syntax-highlighting.sh`
+- `templates/bash/aliases.sh`
 - `templates/starship.toml`
 - `templates/ghostty/config`
 - `templates/jj/config.toml.tmpl`
@@ -21,6 +22,7 @@ blocks into user config files.
 - `templates/zsh/prompt.sh` -> managed prompt block in `~/.zshrc`
 - `templates/zsh/shell-tools.sh` -> managed shell helper block in `~/.zshrc`
 - `templates/zsh/syntax-highlighting.sh` -> managed syntax-highlighting block in `~/.zshrc`
+- `templates/bash/aliases.sh` -> managed alias block in `~/.bashrc`
 - `templates/starship.toml` -> managed block in `~/.config/starship.toml`
 - `templates/ghostty/config` -> managed block in `~/.config/ghostty/config`
 - `templates/jj/config.toml.tmpl` -> rendered into `~/.config/jj/config.toml`

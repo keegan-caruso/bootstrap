@@ -1,0 +1,181 @@
+#!/usr/bin/env zsh
+
+emulate -L zsh
+setopt ERR_EXIT NO_UNSET PIPE_FAIL
+
+script_name="${0:t}"
+script_dir="${0:A:h}"
+script_path="${0:A}"
+flake_path="${script_dir}/nix"
+original_args=("$@")
+
+usage() {
+  print -u2 "Usage: ${script_name} <overlay-name> [-C repository] -- <command> [args...]"
+}
+
+fail() {
+  print -u2 "[${script_name}] $*"
+  exit 1
+}
+
+activate_nix() {
+  local nix_profile
+
+  command -v nix >/dev/null 2>&1 && return
+
+  for nix_profile in \
+    /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh \
+    "${HOME}/.nix-profile/etc/profile.d/nix.sh"
+  do
+    if [[ -r "$nix_profile" ]]; then
+      source "$nix_profile"
+      command -v nix >/dev/null 2>&1 && return
+    fi
+  done
+
+  fail "Nix is not installed. Run ${script_dir}/bootstrap-wsl-nix.sh first."
+}
+
+if (( $# < 3 )); then
+  usage
+  exit 2
+fi
+
+overlay_name="$1"
+shift
+
+repo_path="."
+if [[ "${1:-}" == "-C" ]]; then
+  (( $# >= 3 )) || {
+    usage
+    exit 2
+  }
+  repo_path="$2"
+  shift 2
+fi
+
+if [[ "${1:-}" != "--" ]]; then
+  usage
+  exit 2
+fi
+shift
+
+if (( $# == 0 )); then
+  usage
+  exit 2
+fi
+command_args=("$@")
+
+if [[ "$overlay_name" != [A-Za-z0-9]* \
+  || "$overlay_name" == *[^A-Za-z0-9._-]* ]]; then
+  fail "Overlay name must start with a letter or number and contain only letters, numbers, dots, underscores, or hyphens."
+fi
+
+[[ -f "${flake_path}/flake.nix" ]] \
+  || fail "Nix flake not found: ${flake_path}/flake.nix"
+
+if [[ "${NIX_WT_IN_NIX:-0}" != 1 ]]; then
+  activate_nix
+  exec nix develop "path:${flake_path}" \
+    --command env NIX_WT_IN_NIX=1 "$script_path" "${original_args[@]}"
+fi
+
+for required_command in cksum fuse-overlayfs fusermount3 git mountpoint systemd-run; do
+  command -v "$required_command" >/dev/null 2>&1 \
+    || fail "Required command not found in the Nix dev shell: ${required_command}"
+done
+command -v "${command_args[1]}" >/dev/null 2>&1 \
+  || fail "Command not found in the Nix dev shell: ${command_args[1]}"
+
+[[ -d "$repo_path" ]] || fail "Repository path not found: ${repo_path}"
+repo_root="$(git -C "$repo_path" rev-parse --show-toplevel 2>/dev/null)" \
+  || fail "Path is not inside a Git repository: ${repo_path}"
+repo_root="${repo_root:A}"
+
+[[ -z "$(git -C "$repo_root" status --porcelain)" ]] \
+  || fail "Repository must be clean before creating or reopening an overlay: ${repo_root}"
+
+base_commit="$(git -C "$repo_root" rev-parse HEAD)"
+branch_name="user/keegancaruso/${overlay_name}"
+git check-ref-format --branch "$branch_name" >/dev/null 2>&1 \
+  || fail "Overlay name does not produce a valid Git branch: ${branch_name}"
+
+repo_name="${repo_root:t}"
+repo_slug="${repo_name//[^A-Za-z0-9._-]/-}"
+repo_slug="${repo_slug[1,48]}"
+repo_id="$(print -rn -- "$repo_root" | cksum | awk '{print $1}')"
+repo_key="${repo_slug}-${repo_id}"
+state_dir="${XDG_STATE_HOME:-${HOME}/.local/state}/nix-wt/${repo_key}/${overlay_name}"
+upper_dir="${state_dir}/upper"
+work_dir="${state_dir}/work"
+merged_dir="${state_dir}/merged"
+base_commit_file="${state_dir}/base-commit"
+repo_root_file="${state_dir}/repo-root"
+scope_name="nix-wt-${repo_key}-${overlay_name}.scope"
+(( ${#scope_name} <= 255 )) \
+  || fail "Repository and overlay names produce a systemd scope name longer than 255 characters."
+
+mkdir -p "$upper_dir" "$work_dir" "$merged_dir"
+
+if [[ -f "$repo_root_file" ]]; then
+  overlay_repo_root="$(<"$repo_root_file")"
+  [[ "$overlay_repo_root" == "$repo_root" ]] \
+    || fail "Overlay belongs to ${overlay_repo_root}, not ${repo_root}."
+else
+  print -r -- "$repo_root" >"$repo_root_file"
+fi
+
+if [[ -f "$base_commit_file" ]]; then
+  overlay_base_commit="$(<"$base_commit_file")"
+  [[ "$overlay_base_commit" == "$base_commit" ]] \
+    || fail "Overlay was created from ${overlay_base_commit}; repository is now at ${base_commit}. Use a new overlay name."
+else
+  print -r -- "$base_commit" >"$base_commit_file"
+fi
+
+mountpoint -q "$merged_dir" \
+  && fail "Overlay is already mounted, possibly by another agent: ${merged_dir}"
+
+mounted=0
+cleanup() {
+  if (( mounted )) && ! fusermount3 -u "$merged_dir"; then
+    print -u2 "[${script_name}] Failed to unmount overlay: ${merged_dir}"
+  fi
+}
+trap cleanup EXIT
+trap 'exit 129' HUP
+trap 'exit 130' INT
+trap 'exit 143' TERM
+
+fuse-overlayfs \
+  -o "lowerdir=${repo_root},upperdir=${upper_dir},workdir=${work_dir}" \
+  "$merged_dir"
+mounted=1
+mountpoint -q "$merged_dir" || fail "Overlay mount failed: ${merged_dir}"
+
+if git -C "$merged_dir" show-ref --verify --quiet "refs/heads/${branch_name}"; then
+  git -C "$merged_dir" switch "$branch_name"
+else
+  git -C "$merged_dir" switch -c "$branch_name"
+fi
+
+current_branch="$(git -C "$merged_dir" symbolic-ref --quiet --short HEAD 2>/dev/null)" \
+  || fail "Overlay repository is not on a branch."
+[[ "$current_branch" == "$branch_name" ]] \
+  || fail "Overlay uses '${current_branch}', expected '${branch_name}'."
+
+print "[${script_name}] Repository: ${repo_root}"
+print "[${script_name}] Overlay: ${merged_dir}"
+print "[${script_name}] State: ${state_dir}"
+print "[${script_name}] Branch: ${branch_name}"
+print "[${script_name}] Scope: ${scope_name}"
+print "[${script_name}] Starting: ${(q)command_args}"
+
+cd "$merged_dir"
+systemd-run \
+  --user \
+  --scope \
+  --collect \
+  --unit="$scope_name" \
+  -- \
+  "${command_args[@]}"

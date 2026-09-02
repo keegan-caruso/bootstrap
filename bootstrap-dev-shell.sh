@@ -217,32 +217,28 @@ EOF
   fi
 }
 
-find_windows_credential_manager() {
-  local paths=(
-    "/mnt/c/Program Files/Git/mingw64/bin/git-credential-manager.exe"
-    "/mnt/c/Program Files/Git/mingw64/libexec/git-core/git-credential-manager.exe"
-    "/mnt/c/Program Files (x86)/Git/mingw64/bin/git-credential-manager.exe"
-    "/mnt/c/Program Files/Git/mingw64/libexec/git-core/git-credential-manager-core.exe"
-  )
+configure_gcm_wsl_credential_helper() {
+  local host key
+  local helper="${HOME}/.local/bin/git-credential-manager-wsl"
 
-  for p in "${paths[@]}"; do
-    if [[ -x "$p" ]]; then
-      printf '%s\n' "$p"
-      return
+  command_exists git.exe \
+    || fail "Git for Windows is required for brokered Git authentication."
+
+  mkdir -p "${HOME}/.local/bin"
+  install -m 0755 "${SCRIPT_DIR}/templates/git-credential-manager-wsl" "$helper"
+
+  git config --global credential.helper manager-wsl
+  for host in github.com gist.github.com; do
+    key="credential.https://${host}.helper"
+    if git config --global --get-all "$key" >/dev/null; then
+      git config --global --unset-all "$key"
     fi
   done
 
-  if command_exists git-credential-manager.exe; then
-    command -v git-credential-manager.exe
-    return
-  fi
+  git config --global credential.https://dev.azure.com.useHttpPath true
+  git.exe config --global credential.msauthUseBroker true
 
-  if command_exists git-credential-manager-core.exe; then
-    command -v git-credential-manager-core.exe
-    return
-  fi
-
-  return 1
+  log "Git credential helper set to Windows GCM through the native WSL wrapper"
 }
 
 detect_os() {
@@ -732,6 +728,11 @@ write_zshrc_blocks() {
   upsert_block "$zshrc" "syntax-highlighting" "$syntax_hl_block"
 }
 
+write_bashrc_blocks() {
+  upsert_block "${HOME}/.bashrc" "aliases" \
+    "$(read_template "${SCRIPT_DIR}/templates/bash/aliases.sh")"
+}
+
 write_zshenv_block() {
   upsert_block "${HOME}/.zshenv" "startup" \
     "$(read_template "${SCRIPT_DIR}/templates/zsh/zshenv.sh")"
@@ -779,15 +780,7 @@ configure_git() {
   if [[ "$IS_WSL" -eq 1 ]]; then
     git config --global core.fileMode false
     git config --global core.autocrlf input
-    local gcm_path
-    if gcm_path="$(find_windows_credential_manager)"; then
-      # Git parses credential.helper as a shell-split command, so paths
-      # containing spaces (e.g. "Program Files") must be quoted in the value.
-      git config --global credential.helper "\"${gcm_path}\""
-      log "Git credential helper set to Windows GCM: ${gcm_path}"
-    else
-      log "Windows Git Credential Manager not found; skipping credential.helper"
-    fi
+    configure_gcm_wsl_credential_helper
   fi
 }
 
@@ -821,6 +814,7 @@ main() {
   write_zshenv_block
   write_zshrc_blocks
   remove_block "${HOME}/.bashrc" "wsl-zsh-handoff"
+  write_bashrc_blocks
   write_starship_config
   if [[ "$OS" == "macos" || "$IS_WSL" -eq 0 ]]; then
     write_ghostty_config

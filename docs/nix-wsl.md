@@ -90,12 +90,12 @@ Out of scope for this script (handle separately if needed):
 ## Updating
 
 ```bash
-# Refresh the nixpkgs pin in flake.lock
-nix flake update ./nix
-
-# Apply the new profile generation
-nix profile upgrade '.*wsl-dev-tools.*'
+./update-wsl-nix.sh
 ```
+
+The update helper refreshes `nix/flake.lock`, checks and builds the flake, and
+applies the new `wsl-dev-tools` profile generation. Review and commit the lock
+file after the script succeeds.
 
 ## Rolling back
 

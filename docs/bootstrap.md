@@ -71,8 +71,7 @@ The script detects WSL automatically and changes behavior:
 - skips `chsh`
 - uses a Windows-hosted `code` launcher instead of trying to install Linux
   VS Code
-- writes a guarded `.bashrc` block so interactive bash sessions hand off to
-  `zsh`
+- writes modern CLI aliases into `.bashrc` for interactive bash sessions
 - adds Windows interop helpers through shell config
 - installs `wslu` (falling back to the upstream `wslutilities/wslu` PPA if
   the package isn't in the configured apt sources) and installs a
@@ -135,8 +134,15 @@ On WSL it also sets:
 
 - `core.fileMode=false`
 - `core.autocrlf=input`
-- `credential.helper=manager-core` if Git Credential Manager is already
-  present
+- `credential.helper=manager-wsl`, backed by a native
+  `~/.local/bin/git-credential-manager-wsl` wrapper
+- `credential.https://dev.azure.com.useHttpPath=true`
+- Windows GCM broker authentication through
+  `credential.msauthUseBroker=true` in the Windows Git configuration
+
+The wrapper invokes `git.exe credential-manager`, allowing Git in WSL to use
+Windows Web Account Manager without storing a Windows executable path in the
+WSL Git configuration. The Nix toolset includes the same wrapper.
 
 JJ config is generated from `templates/jj/config.toml.tmpl` using the same
 Git identity values.
