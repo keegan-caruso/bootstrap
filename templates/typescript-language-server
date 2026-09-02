@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if ! command -v tsc >/dev/null 2>&1; then
+  printf 'typescript-language-server: tsc is not available on PATH\n' >&2
+  exit 1
+fi
+
+exec tsc --lsp "$@"

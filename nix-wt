@@ -33,7 +33,7 @@ activate_nix() {
     fi
   done
 
-  fail "Nix is not installed. Run ${script_dir}/bootstrap-wsl-nix.sh first."
+  fail "Nix is not installed. Run ${script_dir}/bootstrap-nix.sh first."
 }
 
 if (( $# < 3 )); then

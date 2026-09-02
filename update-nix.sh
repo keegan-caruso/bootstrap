@@ -3,6 +3,9 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 FLAKE_DIR="${SCRIPT_DIR}/nix"
+# shellcheck source=lib/platform.sh
+# shellcheck disable=SC1091
+source "${SCRIPT_DIR}/lib/platform.sh"
 
 log() {
   printf '[update-nix] %s\n' "$*"
@@ -29,7 +32,7 @@ activate_nix() {
     fi
   done
 
-  fail "Nix is not installed. Run ${SCRIPT_DIR}/bootstrap-wsl-nix.sh first."
+  fail "Nix is not installed. Run ${SCRIPT_DIR}/bootstrap-nix.sh first."
 }
 
 main() {
@@ -49,10 +52,27 @@ main() {
   nix flake check "path:${FLAKE_DIR}"
 
   log "Building the updated tool environment"
-  nix build --no-link "path:${FLAKE_DIR}#default"
+  if [[ "$(uname -s)" == "Linux" ]] && is_wsl; then
+    nix build --no-link "path:${FLAKE_DIR}#default"
+  else
+    nix build --no-link "path:${FLAKE_DIR}#workstation"
+  fi
 
-  log "Upgrading the installed WSL development tools profile"
-  nix profile upgrade '.*wsl-dev-tools.*'
+  log "Upgrading installed profile entries from this flake"
+  profile_entries="$(
+    nix profile list --json \
+      | jq -r --arg url "path:${FLAKE_DIR}" '
+          .elements
+          | to_entries[]
+          | select(.value.originalUrl == $url)
+          | .key
+        '
+  )"
+  [[ -n "$profile_entries" ]] \
+    || fail "No installed profile entry references ${FLAKE_DIR}; run bootstrap-nix.sh first."
+  while IFS= read -r profile_entry; do
+    nix profile upgrade "$profile_entry"
+  done <<<"$profile_entries"
 
   log "Update complete. Review and commit nix/flake.lock."
 }

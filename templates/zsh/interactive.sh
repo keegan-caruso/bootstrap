@@ -134,7 +134,6 @@ if [[ -o interactive && -z "${ZSH_NONINTERACTIVE_SAFE:-}" ]]; then
 
   # zsh-autosuggestions
   for _zsh_autosuggestions in \
-    "${HOMEBREW_PREFIX:-}/share/zsh-autosuggestions/zsh-autosuggestions.zsh" \
     "$HOME/.nix-profile/share/zsh-autosuggestions/zsh-autosuggestions.zsh" \
     /usr/share/zsh-autosuggestions/zsh-autosuggestions.zsh
   do

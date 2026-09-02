@@ -8,7 +8,8 @@ if [[ -n "$_fnm_binary" ]]; then
 
   _fnm_lazy_commands=(
     fnm node npm npx corepack pnpm pnpx yarn yarnpkg
-    tsc tsserver typescript-language-server
+    tsc typescript-language-server
+    markdownlint-cli2 oxfmt oxlint
   )
 
   _fnm_define_lazy_wrappers() {
@@ -76,12 +77,12 @@ export FZF_ALT_C_COMMAND='fd --type d --hidden --exclude .git'
 export BAT_THEME='GitHub'
 export FZF_DEFAULT_OPTS='--height 40% --layout=reverse --border --preview '\''if [[ -d {} ]]; then eza --tree --level=2 --color=always {}; else bat --theme=GitHub --style=numbers --color=always --line-range :200 {}; fi'\'''
 
-if [[ -f "${HOMEBREW_PREFIX:-}/opt/fzf/shell/key-bindings.zsh" ]]; then
-  _zsh_cache_source "${HOMEBREW_PREFIX}/opt/fzf/shell/key-bindings.zsh" fzf-key-bindings
+if [[ -f "$HOME/.nix-profile/share/fzf/key-bindings.zsh" ]]; then
+  _zsh_cache_source "$HOME/.nix-profile/share/fzf/key-bindings.zsh" fzf-key-bindings
 fi
 
-if [[ -f "${HOMEBREW_PREFIX:-}/opt/fzf/shell/completion.zsh" ]]; then
-  _zsh_cache_source "${HOMEBREW_PREFIX}/opt/fzf/shell/completion.zsh" fzf-completion
+if [[ -f "$HOME/.nix-profile/share/fzf/completion.zsh" ]]; then
+  _zsh_cache_source "$HOME/.nix-profile/share/fzf/completion.zsh" fzf-completion
 fi
 
 if [[ -o interactive && -z "${ZSH_NONINTERACTIVE_SAFE:-}" ]]; then

@@ -1,13 +1,6 @@
 # shellcheck shell=bash
 
-for _brew_prefix in /opt/homebrew /usr/local /home/linuxbrew/.linuxbrew; do
-  if [[ -x "$_brew_prefix/bin/brew" ]]; then
-    export HOMEBREW_PREFIX="$_brew_prefix"
-    export PATH="$_brew_prefix/bin:$_brew_prefix/sbin:$PATH"
-    break
-  fi
-done
-unset _brew_prefix
+export PATH="$HOME/.nix-profile/bin:$HOME/.local/bin:$PATH"
 
 # Modern CLI aliases
 alias grep='rg'
