@@ -70,7 +70,7 @@ Excluded here:
 
 - [xh](xh.md)
 - [doggo](doggo.md)
-- [xclip](xclip.md)
+- [wl-clipboard](wl-clipboard.md)
 
 ## Terminal UI
 

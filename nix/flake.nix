@@ -122,7 +122,7 @@
             ++ lib.optionals pkgs.stdenv.hostPlatform.isLinux [
               fuse-overlayfs
               util-linux
-              xclip
+              wl-clipboard
             ];
           wslTools = lib.optionals pkgs.stdenv.hostPlatform.isLinux [
             gcmWsl
