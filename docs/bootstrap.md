@@ -27,9 +27,9 @@ The bootstrap uses `fnm` from Nix to install Node.js LTS. npm owns the tools
 that are distributed natively through npm:
 
 - `typescript@7.0.2`
-- `markdownlint-cli2`
-- `oxfmt`
-- `oxlint`
+- `markdownlint-cli2@0.23.2`
+- `oxfmt@0.66.0`
+- `oxlint@1.81.0`
 
 The installed `typescript-language-server` compatibility command runs
 TypeScript 7's native `tsc --lsp` mode.
