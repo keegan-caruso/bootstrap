@@ -25,6 +25,9 @@ command -v nix >/dev/null 2>&1 || {
   exit 1
 }
 
+printf 'Testing bootstrap behavior with an isolated HOME\n'
+"${SCRIPT_DIR}/test-bootstrap.sh"
+
 printf 'Evaluating all supported Nix systems\n'
 nix flake check --all-systems --no-build "path:${FLAKE_DIR}"
 

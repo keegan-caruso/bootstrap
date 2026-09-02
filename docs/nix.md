@@ -49,3 +49,13 @@ nix profile rollback --profile "$profile"
 ```bash
 nix develop ./nix
 ```
+
+## Checks
+
+```bash
+./test-nix.sh
+```
+
+This first exercises bootstrap behavior in an isolated temporary home
+directory, then evaluates every supported system and builds the current
+machine's tool environment.

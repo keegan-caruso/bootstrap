@@ -91,8 +91,15 @@ atomically upgrades the dedicated bootstrap profile.
 ## Local checks
 
 ```bash
+./test-bootstrap.sh
 ./test-nix.sh
 ```
 
-This evaluates every supported system and builds the tool environment for the
-current machine. It does not use CI or a container runtime.
+The bootstrap integration test uses an isolated temporary home directory and
+stubbed external commands. It checks idempotent managed configuration,
+Homebrew-block removal, npm registry overrides, and WSL/native flake output
+selection without modifying the real home directory.
+
+The Nix test runs the bootstrap integration test, evaluates every supported
+system, and builds the tool environment for the current machine. It does not
+use CI or a container runtime.
