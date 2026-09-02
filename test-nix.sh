@@ -32,10 +32,6 @@ printf 'Evaluating all supported Nix systems\n'
 nix flake check --all-systems --no-build "path:${FLAKE_DIR}"
 
 printf 'Building the current system tool environment\n'
-if [[ "$(uname -s)" == "Linux" ]] && is_wsl; then
-  nix build --no-link "path:${FLAKE_DIR}#default"
-else
-  nix build --no-link "path:${FLAKE_DIR}#workstation"
-fi
+nix build --no-link "path:${FLAKE_DIR}#$(nix_tool_output)"
 
 printf 'Nix bootstrap checks passed\n'

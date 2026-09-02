@@ -64,11 +64,7 @@ main() {
   nix flake check "path:${FLAKE_DIR}"
 
   log "Building the updated tool environment"
-  if [[ "$(uname -s)" == "Linux" ]] && is_wsl; then
-    output_name="default"
-  else
-    output_name="workstation"
-  fi
+  output_name="$(nix_tool_output)"
   nix build --no-link "${FLAKE_URL}#${output_name}"
 
   [[ -e "$PROFILE_PATH" || -L "$PROFILE_PATH" ]] \

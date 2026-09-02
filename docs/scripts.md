@@ -10,6 +10,7 @@ Main machine bootstrap. It handles:
 - CLI, .NET, Python, Rust, fonts, and Ghostty through Nix
 - Node.js installation through `fnm`
 - npm-native tools using the configured npm registry
+- cleanup of legacy .NET bootstrap artifacts, with opt-in directory removal
 - shell, prompt, Ghostty, and JJ config generation
 - Git configuration
 

@@ -48,6 +48,14 @@ assert_marker_once() {
     || fail_test "Expected one ${marker} marker in ${file}, found ${count}"
 }
 
+assert_equals() {
+  local expected="$1"
+  local actual="$2"
+
+  [[ "$actual" == "$expected" ]] \
+    || fail_test "Expected '${expected}', found '${actual}'"
+}
+
 test_managed_config_is_idempotent() {
   local first_run="${TEST_ROOT}/first-run"
 
@@ -153,20 +161,89 @@ test_platform_output_selection() {
 
   IS_WSL=1
   install_dev_tools
-  assert_contains "nix build --no-link ${PROFILE_REF}" "$command_log"
-  assert_contains "profile ${PROFILE_REF} packages.x86_64-linux.default" "$command_log"
+  assert_contains "nix build --no-link ${FLAKE_URL}#default" "$command_log"
+  assert_contains \
+    "profile ${FLAKE_URL}#default packages.x86_64-linux.default" \
+    "$command_log"
 
   : >"$command_log"
   IS_WSL=0
+  assert_equals "workstation" "$(nix_tool_output "$IS_WSL")"
   install_dev_tools
-  assert_contains "nix build --no-link ${WORKSTATION_PROFILE_REF}" "$command_log"
+  assert_contains "nix build --no-link ${FLAKE_URL}#workstation" "$command_log"
   assert_contains \
-    "profile ${WORKSTATION_PROFILE_REF} packages.x86_64-linux.workstation" \
+    "profile ${FLAKE_URL}#workstation packages.x86_64-linux.workstation" \
     "$command_log"
+}
+
+test_platform_output_autodetection() (
+  local system_name="Linux"
+  local mock_wsl_state=1
+
+  # shellcheck disable=SC2329
+  uname() {
+    [[ "${1:-}" == "-s" ]] \
+      || fail_test "Unexpected uname command: $*"
+    printf '%s\n' "$system_name"
+  }
+
+  # shellcheck disable=SC2329
+  is_wsl() {
+    [[ "$mock_wsl_state" -eq 1 ]]
+  }
+
+  assert_equals "default" "$(nix_tool_output)"
+
+  mock_wsl_state=0
+  assert_equals "workstation" "$(nix_tool_output)"
+
+  system_name="Darwin"
+  mock_wsl_state=1
+  assert_equals "workstation" "$(nix_tool_output)"
+)
+
+test_legacy_tool_cleanup() {
+  local legacy_csharpier="${HOME}/.local/bin/csharpier"
+  local legacy_dotnet="${HOME}/.dotnet"
+  local legacy_installer="${HOME}/.cache/${SCRIPT_MARKER}/dotnet-install.sh"
+
+  mkdir -p \
+    "${legacy_dotnet}/sdk" \
+    "${legacy_dotnet}/tools" \
+    "${HOME}/.local/bin" \
+    "$(dirname "$legacy_installer")"
+  touch "${legacy_dotnet}/sdk/user-managed-sdk"
+  touch "${legacy_dotnet}/tools/csharpier"
+  touch "$legacy_installer"
+  ln -s "${legacy_dotnet}/tools/csharpier" "$legacy_csharpier"
+
+  remove_legacy_tool_installations
+
+  [[ -f "${legacy_dotnet}/sdk/user-managed-sdk" ]] \
+    || fail_test "Non-empty .NET installation was removed without opt-in"
+  [[ ! -e "$legacy_csharpier" && ! -L "$legacy_csharpier" ]] \
+    || fail_test "Legacy CSharpier shim was not removed"
+  [[ ! -e "$legacy_installer" ]] \
+    || fail_test "Legacy cached installer was not removed"
+
+  ln -s "${HOME}/custom-tools/csharpier" "$legacy_csharpier"
+  remove_legacy_tool_installations
+  [[ -d "$legacy_dotnet" ]] \
+    || fail_test "Non-empty .NET installation was removed without opt-in"
+  [[ -L "$legacy_csharpier" ]] \
+    || fail_test "Non-legacy CSharpier shim was removed"
+
+  BOOTSTRAP_REMOVE_LEGACY_DOTNET=1 remove_legacy_tool_installations
+  [[ ! -e "$legacy_dotnet" ]] \
+    || fail_test "Opted-in legacy .NET installation was not removed"
+  [[ -L "$legacy_csharpier" ]] \
+    || fail_test "Non-legacy CSharpier shim was removed during opted-in cleanup"
 }
 
 test_managed_config_is_idempotent
 test_npm_registry_override
 test_platform_output_selection
+test_platform_output_autodetection
+test_legacy_tool_cleanup
 
 printf 'Bootstrap integration checks passed\n'

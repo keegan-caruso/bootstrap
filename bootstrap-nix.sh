@@ -7,8 +7,6 @@ IS_WSL=0
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 FLAKE_DIR="${SCRIPT_DIR}/nix"
 FLAKE_URL="path:${FLAKE_DIR}"
-PROFILE_REF="path:${FLAKE_DIR}#default"
-WORKSTATION_PROFILE_REF="path:${FLAKE_DIR}#workstation"
 STATE_HOME="${XDG_STATE_HOME:-${HOME}/.local/state}"
 PROFILE_PATH="${STATE_HOME}/nix/profiles/bootstrap"
 NIX_INSTALLER_VERSION="v3.22.2"
@@ -378,16 +376,13 @@ source_nix() {
 }
 
 install_dev_tools() {
-  local profile_ref="$PROFILE_REF"
   local current_system
   local desired_attr
   local output_name
+  local profile_ref
 
-  if [[ "$IS_WSL" -eq 0 ]]; then
-    profile_ref="$WORKSTATION_PROFILE_REF"
-  fi
-
-  output_name="${profile_ref##*#}"
+  output_name="$(nix_tool_output "$IS_WSL")"
+  profile_ref="${FLAKE_URL}#${output_name}"
   current_system="$(nix eval --impure --raw --expr builtins.currentSystem)"
   desired_attr="packages.${current_system}.${output_name}"
 
@@ -464,6 +459,35 @@ remove_legacy_profile_entries() {
     log "Removing legacy shared-profile entry"
     nix profile remove "$legacy_store_path"
   done <<<"$legacy_store_paths"
+}
+
+remove_legacy_tool_installations() {
+  local legacy_csharpier="${HOME}/.local/bin/csharpier"
+  local legacy_dotnet="${HOME}/.dotnet"
+  local legacy_installer="${XDG_CACHE_HOME:-${HOME}/.cache}/${SCRIPT_MARKER}/dotnet-install.sh"
+  local csharpier_target
+
+  if [[ -L "$legacy_csharpier" ]]; then
+    csharpier_target="$(readlink "$legacy_csharpier")"
+    if [[ "$csharpier_target" == "${legacy_dotnet}/tools/csharpier" ]]; then
+      log "Removing legacy CSharpier shim"
+      rm -f "$legacy_csharpier"
+    fi
+  fi
+
+  if [[ -f "$legacy_installer" ]]; then
+    rm -f "$legacy_installer"
+    rmdir "$(dirname "$legacy_installer")" 2>/dev/null || true
+  fi
+
+  if [[ "${BOOTSTRAP_REMOVE_LEGACY_DOTNET:-0}" == "1" && -d "$legacy_dotnet" ]]; then
+    log "Removing legacy bootstrap-managed .NET installation"
+    rm -rf "$legacy_dotnet"
+  elif [[ -d "$legacy_dotnet" ]] && rmdir "$legacy_dotnet" 2>/dev/null; then
+    log "Removing empty legacy .NET installation directory"
+  elif [[ -d "$legacy_dotnet" ]]; then
+    log "Leaving ${legacy_dotnet}; set BOOTSTRAP_REMOVE_LEGACY_DOTNET=1 to remove it"
+  fi
 }
 
 register_nix_profile_fonts() {
@@ -682,6 +706,7 @@ main() {
   configure_git
   write_jj_config
   remove_legacy_profile_entries
+  remove_legacy_tool_installations
 
   log "Nix bootstrap complete"
   log "Open a new shell or run: source ~/.zshrc"

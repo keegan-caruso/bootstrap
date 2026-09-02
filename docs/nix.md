@@ -13,6 +13,9 @@ development environment.
 Supported Nix systems are `x86_64-linux`, `aarch64-linux`, and
 `aarch64-darwin`.
 
+The shared platform helper selects `default` on WSL and `workstation` on native
+Linux and macOS for bootstrap, update, and local build checks.
+
 ## Install
 
 ```bash

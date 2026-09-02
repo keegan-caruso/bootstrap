@@ -34,6 +34,20 @@ that are distributed natively through npm:
 The installed `typescript-language-server` compatibility command runs
 TypeScript 7's native `tsc --lsp` mode.
 
+After the Nix profile and shell configuration are ready, the bootstrap removes
+the old CSharpier symlink and cached .NET installer. It preserves a non-empty
+`~/.dotnet` because the previous bootstrap allowed a custom `DOTNET_ROOT`, so
+ownership of that directory cannot be inferred safely. To explicitly remove
+it during migration:
+
+```bash
+BOOTSTRAP_REMOVE_LEGACY_DOTNET=1 ./bootstrap-nix.sh
+```
+
+User-managed Cargo state is not removed. The superseded npm
+`typescript-language-server` package is uninstalled from the active fnm runtime
+before the compatibility command is installed.
+
 ## npm registry configuration
 
 npm installation honors normal project, user, and global `.npmrc` files,
@@ -98,7 +112,7 @@ atomically upgrades the dedicated bootstrap profile.
 The bootstrap integration test uses an isolated temporary home directory and
 stubbed external commands. It checks idempotent managed configuration,
 Homebrew-block removal, npm registry overrides, and WSL/native flake output
-selection without modifying the real home directory.
+selection, plus legacy tool cleanup, without modifying the real home directory.
 
 The Nix test runs the bootstrap integration test, evaluates every supported
 system, and builds the tool environment for the current machine. It does not
