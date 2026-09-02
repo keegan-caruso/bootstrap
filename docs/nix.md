@@ -16,6 +16,9 @@ Supported Nix systems are `x86_64-linux`, `aarch64-linux`, and
 The shared platform helper selects `default` on WSL and `workstation` on native
 Linux and macOS for bootstrap, update, and local build checks.
 
+The flake exposes the official `nixfmt` from the pinned nixpkgs revision as its
+formatter.
+
 ## Install
 
 ```bash
@@ -60,5 +63,5 @@ nix develop ./nix
 ```
 
 This first exercises bootstrap behavior in an isolated temporary home
-directory, then evaluates every supported system and builds the current
-machine's tool environment.
+directory, checks Nix formatting, evaluates every supported system, and builds
+the current machine's tool environment.

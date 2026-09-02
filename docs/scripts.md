@@ -63,8 +63,9 @@ After it succeeds, review and commit the `nix/flake.lock` change.
 
 ## `test-nix.sh`
 
-Evaluates the flake for every supported system and builds the current machine's
-tool environment locally.
+Runs the isolated-home bootstrap checks, verifies `nixfmt` formatting, evaluates
+the flake for every supported system, and builds the current machine's tool
+environment locally.
 
 Run:
 

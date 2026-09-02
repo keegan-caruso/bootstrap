@@ -3,7 +3,8 @@
 
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
 
-  outputs = { nixpkgs, ... }:
+  outputs =
+    { nixpkgs, ... }:
     let
       systems = [
         "x86_64-linux"
@@ -12,7 +13,8 @@
       ];
       forAllSystems = nixpkgs.lib.genAttrs systems;
 
-      mkPackages = system:
+      mkPackages =
+        system:
         let
           pkgs = import nixpkgs {
             inherit system;
@@ -70,55 +72,58 @@
             pkgs.dotnetCorePackages.sdk_8_0
             pkgs.dotnetCorePackages.sdk_10_0
           ];
-          cliTools = with pkgs; [
-            bat
-            bottom
-            cmark
-            cmake
-            coreutils
-            csharpier
-            delta
-            doggo
-            duf
-            dust
-            eza
-            fd
-            fnm
-            fontconfig
-            fzf
-            gh
-            git
-            hyperfine
-            jq
-            jujutsu
-            ncdu
-            pandoc
-            procs
-            ripgrep
-            ruff
-            rust-analyzer
-            sd
-            shellcheck
-            shfmt
-            starship
-            taplo
-            tokei
-            ty
-            uv
-            xh
-            yamllint
-            yq-go
-            zellij
-            zoxide
-            zsh
-            zsh-autosuggestions
-            zsh-syntax-highlighting
-            dotnetSdk
-          ] ++ lib.optionals pkgs.stdenv.hostPlatform.isLinux [
-            fuse-overlayfs
-            util-linux
-            xclip
-          ];
+          cliTools =
+            with pkgs;
+            [
+              bat
+              bottom
+              cmark
+              cmake
+              coreutils
+              csharpier
+              delta
+              doggo
+              duf
+              dust
+              eza
+              fd
+              fnm
+              fontconfig
+              fzf
+              gh
+              git
+              hyperfine
+              jq
+              jujutsu
+              ncdu
+              pandoc
+              procs
+              ripgrep
+              ruff
+              rust-analyzer
+              sd
+              shellcheck
+              shfmt
+              starship
+              taplo
+              tokei
+              ty
+              uv
+              xh
+              yamllint
+              yq-go
+              zellij
+              zoxide
+              zsh
+              zsh-autosuggestions
+              zsh-syntax-highlighting
+              dotnetSdk
+            ]
+            ++ lib.optionals pkgs.stdenv.hostPlatform.isLinux [
+              fuse-overlayfs
+              util-linux
+              xclip
+            ];
           wslTools = lib.optionals pkgs.stdenv.hostPlatform.isLinux [
             gcmWsl
             wslview
@@ -133,7 +138,14 @@
           ];
         in
         {
-          inherit agency cliTools desktopTools fonts pkgs wslTools;
+          inherit
+            agency
+            cliTools
+            desktopTools
+            fonts
+            pkgs
+            wslTools
+            ;
           default = pkgs.buildEnv {
             name = "dev-tools";
             paths = cliTools ++ fonts ++ wslTools;
@@ -149,15 +161,20 @@
         };
     in
     {
-      packages = forAllSystems (system:
+      packages = forAllSystems (
+        system:
         let
           p = mkPackages system;
         in
         {
           inherit (p) default desktop workstation;
-        });
+        }
+      );
 
-      devShells = forAllSystems (system:
+      formatter = forAllSystems (system: (mkPackages system).pkgs.nixfmt);
+
+      devShells = forAllSystems (
+        system:
         let
           p = mkPackages system;
         in
@@ -165,6 +182,7 @@
           default = p.pkgs.mkShell {
             packages = p.cliTools ++ p.fonts ++ [ p.agency ];
           };
-        });
+        }
+      );
     };
 }
