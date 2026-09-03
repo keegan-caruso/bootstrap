@@ -175,20 +175,16 @@ initialization inside linked Git worktrees. Git objects are copied so later
 maintenance or garbage collection in the source checkout cannot invalidate a
 persisted overlay. Refs, indexes, and Jujutsu operations also remain isolated.
 
-State created by older versions does not have an immutable lower directory and
-is refused. To recover one temporarily, mount it manually using its original
-source checkout as the lower directory:
-
-```bash
-fuse-overlayfs \
-  -o lowerdir=/path/to/repository,upperdir=/path/to/state/upper,workdir=/path/to/state/work \
-  /path/to/state/merged
-```
-
-Push the old branch or bookmark, unmount it with
-`fusermount3 -u /path/to/state/merged`, and create a new overlay name. Commits
-and refs created in a new overlay remain in its writable layer, so push the
-branch or bookmark before deleting its state and lower checkout.
+State created by older versions is migrated automatically on first reopen.
+The launcher reconstructs an immutable Git lower checkout at the recorded base
+commit, preserves the existing writable layer, and records the new lower
+metadata before mounting it. New Jujutsu-aware overlays still use isolated
+Jujutsu metadata; migrated legacy overlays remain in their original Git mode.
+If the recorded base commit is no longer available, recover it from the remote
+or another clone before reopening the overlay. A legacy writable layer that
+contains `.jj` metadata is refused before migration because partial Jujutsu
+state cannot be reconstructed safely; reopen that overlay with the older
+launcher and push its work first.
 
 The command runs in a collectible systemd user scope named
 `nix-wt-<repo-name>-<repo-id>-<overlay-name>.scope`. The scope is removed after

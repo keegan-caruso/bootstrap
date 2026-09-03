@@ -96,7 +96,96 @@ test_jj_overlay_uses_isolated_metadata() {
   assert_no_test_mounts
 }
 
+test_legacy_overlay_migrates_without_losing_upper_work() {
+  local repository="${TEST_ROOT}/legacy-repo"
+  local overlay_name="legacy-test"
+  local repo_id
+  local state
+  local lower
+  local base_commit
+
+  create_git_repository "$repository"
+  base_commit="$(git -C "$repository" rev-parse HEAD)"
+  repo_id="$(printf '%s' "$repository" | cksum | awk '{print $1}')"
+  state="${XDG_STATE_HOME}/nix-wt/legacy-repo-${repo_id}/${overlay_name}"
+  lower="${repository}.worktrees/nix-wt-${overlay_name}"
+  mkdir -p "$state/upper" "$state/work" "$state/merged"
+  printf '%s\n' "$repository" >"$state/repo-root"
+  printf '%s\n' "$base_commit" >"$state/base-commit"
+  printf 'preserved overlay work\n' >"$state/upper/overlay.txt"
+
+  advance_repository "$repository"
+  NIX_WT_IN_NIX=1 "${REPO_DIR}/nix-wt" "$overlay_name" -C "$repository" -- \
+    bash -lc 'test "$(cat overlay.txt)" = "preserved overlay work" && test ! -e new-main.txt'
+
+  [[ "$(cat "$state/lower-dir")" == "$lower" ]] \
+    || fail_test "Legacy overlay migration recorded the wrong lower directory."
+  [[ "$(cat "$state/vcs-mode")" == "git" ]] \
+    || fail_test "Legacy overlay migration did not preserve Git mode."
+  [[ "$(git -C "$lower" rev-parse HEAD)" == "$base_commit" ]] \
+    || fail_test "Legacy overlay lower was not reconstructed at its recorded base."
+  assert_no_test_mounts
+}
+
+test_interrupted_legacy_migration_resumes() {
+  local repository="${TEST_ROOT}/interrupted-repo"
+  local overlay_name="interrupted-test"
+  local repo_id
+  local state
+  local lower
+  local base_commit
+
+  create_git_repository "$repository"
+  base_commit="$(git -C "$repository" rev-parse HEAD)"
+  repo_id="$(printf '%s' "$repository" | cksum | awk '{print $1}')"
+  state="${XDG_STATE_HOME}/nix-wt/interrupted-repo-${repo_id}/${overlay_name}"
+  lower="${repository}.worktrees/nix-wt-${overlay_name}"
+  mkdir -p "$state/upper" "$state/work" "$state/merged" "$(dirname "$lower")"
+  printf '%s\n' "$repository" >"$state/repo-root"
+  printf '%s\n' "$base_commit" >"$state/base-commit"
+  git clone -q --no-hardlinks "$repository" "$lower"
+  git -C "$lower" checkout -q --detach "$base_commit"
+  printf '%s\n' "$lower" >"$state/lower-dir"
+
+  NIX_WT_IN_NIX=1 "${REPO_DIR}/nix-wt" "$overlay_name" -C "$repository" -- \
+    bash -lc 'test -z "$(git status --short)"'
+
+  [[ "$(cat "$state/vcs-mode")" == "git" ]] \
+    || fail_test "Interrupted legacy migration did not complete VCS metadata."
+  assert_no_test_mounts
+}
+
+test_legacy_jj_overlay_fails_before_migration() {
+  local repository="${TEST_ROOT}/legacy-jj-repo"
+  local overlay_name="legacy-jj-test"
+  local repo_id
+  local state
+  local base_commit
+
+  create_git_repository "$repository"
+  base_commit="$(git -C "$repository" rev-parse HEAD)"
+  repo_id="$(printf '%s' "$repository" | cksum | awk '{print $1}')"
+  state="${XDG_STATE_HOME}/nix-wt/legacy-jj-repo-${repo_id}/${overlay_name}"
+  mkdir -p "$state/upper/.jj/repo" "$state/work" "$state/merged"
+  printf '%s\n' "$repository" >"$state/repo-root"
+  printf '%s\n' "$base_commit" >"$state/base-commit"
+  printf 'git\n' >"$state/upper/.jj/repo/type"
+
+  if NIX_WT_IN_NIX=1 "${REPO_DIR}/nix-wt" "$overlay_name" -C "$repository" -- \
+    true >/dev/null 2>&1
+  then
+    fail_test "Legacy Jujutsu overlay was migrated as Git."
+  fi
+  [[ ! -e "${repository}.worktrees/nix-wt-${overlay_name}" ]] \
+    || fail_test "Legacy Jujutsu refusal created a lower directory."
+  [[ ! -e "$state/lower-dir" && ! -e "$state/vcs-mode" ]] \
+    || fail_test "Legacy Jujutsu refusal wrote migration metadata."
+}
+
 test_git_overlay_uses_immutable_lower
 test_jj_overlay_uses_isolated_metadata
+test_legacy_overlay_migrates_without_losing_upper_work
+test_interrupted_legacy_migration_resumes
+test_legacy_jj_overlay_fails_before_migration
 
 printf 'nix-wt immutable lower checks passed\n'

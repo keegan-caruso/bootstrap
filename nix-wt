@@ -135,55 +135,105 @@ else
   print -r -- "$repo_root" >"$repo_root_file"
 fi
 
-if [[ -f "$base_commit_file" ]]; then
-  overlay_base_commit="$(<"$base_commit_file")"
-  [[ -f "$lower_dir_file" && -f "$vcs_mode_file" ]] \
-    || fail "Overlay predates immutable lower directories. Push any work and use a new overlay name: ${overlay_name}"
-  overlay_lower_dir="$(<"$lower_dir_file")"
-  [[ "$overlay_lower_dir" == "$lower_dir" ]] \
-    || fail "Overlay lower directory is ${overlay_lower_dir}, expected ${lower_dir}."
-  [[ -d "$lower_dir" ]] \
-    || fail "Overlay lower directory is missing: ${lower_dir}"
-  vcs_mode="$(<"$vcs_mode_file")"
-  [[ "$vcs_mode" == "git" || "$vcs_mode" == "jj" ]] \
-    || fail "Overlay has an invalid VCS mode: ${vcs_mode}"
-else
+create_immutable_lower() {
+  local requested_vcs_mode="$1"
+  local lower_ready=0
+  local origin_url
+
   [[ ! -e "$lower_dir" ]] \
     || fail "Lower directory already exists without matching overlay state: ${lower_dir}"
   [[ ! -e "$lower_staging_dir" ]] \
     || fail "Lower-directory staging path already exists: ${lower_staging_dir}"
+  git -C "$repo_root" cat-file -e "${overlay_base_commit}^{commit}" 2>/dev/null \
+    || fail "Overlay base commit is no longer available: ${overlay_base_commit}"
 
   mkdir -p "$lower_parent"
-  lower_ready=0
   cleanup_lower_staging() {
     (( lower_ready )) || rm -rf -- "$lower_staging_dir"
   }
   trap cleanup_lower_staging EXIT
 
   git clone --quiet --no-hardlinks --no-checkout "$repo_root" "$lower_staging_dir"
-  git -C "$lower_staging_dir" checkout --quiet --detach "$base_commit"
+  git -C "$lower_staging_dir" checkout --quiet --detach "$overlay_base_commit"
 
   origin_url="$(git -C "$repo_root" remote get-url origin 2>/dev/null || true)"
   if [[ -n "$origin_url" ]]; then
     git -C "$lower_staging_dir" remote set-url origin "$origin_url"
   fi
 
-  if [[ -d "${repo_root}/.jj" ]]; then
+  if [[ "$requested_vcs_mode" == "jj" ]]; then
     command -v jj >/dev/null 2>&1 \
       || fail "Jujutsu is required for the source repository: ${repo_root}"
     jj git init --colocate "$lower_staging_dir" >/dev/null
-    vcs_mode="jj"
-  else
-    vcs_mode="git"
   fi
+  vcs_mode="$requested_vcs_mode"
 
   mv -- "$lower_staging_dir" "$lower_dir"
   lower_ready=1
   trap - EXIT
+}
 
+validate_immutable_lower() {
+  [[ -d "${lower_dir}/.git" ]] \
+    || fail "Overlay lower directory is not a Git checkout: ${lower_dir}"
+  [[ "$(git -C "$lower_dir" rev-parse HEAD 2>/dev/null)" == "$overlay_base_commit" ]] \
+    || fail "Overlay lower directory is not at the recorded base commit: ${lower_dir}"
+}
+
+write_overlay_metadata() {
+  local lower_dir_tmp="${lower_dir_file}.tmp.$$"
+  local vcs_mode_tmp="${vcs_mode_file}.tmp.$$"
+
+  print -r -- "$lower_dir" >"$lower_dir_tmp"
+  print -r -- "$vcs_mode" >"$vcs_mode_tmp"
+  mv -- "$lower_dir_tmp" "$lower_dir_file"
+  mv -- "$vcs_mode_tmp" "$vcs_mode_file"
+}
+
+if [[ -f "$base_commit_file" ]]; then
+  overlay_base_commit="$(<"$base_commit_file")"
+  if [[ ! -f "$lower_dir_file" || ! -f "$vcs_mode_file" ]]; then
+    [[ ! -e "${upper_dir}/.jj" && ! -L "${upper_dir}/.jj" ]] \
+      || fail "Legacy overlay contains Jujutsu metadata and cannot be migrated automatically. Reopen it with the original nix-wt version and push its work: ${overlay_name}"
+    if [[ -f "$lower_dir_file" ]]; then
+      [[ "$(<"$lower_dir_file")" == "$lower_dir" ]] \
+        || fail "Overlay lower directory metadata is invalid: ${lower_dir_file}"
+    fi
+    if [[ -f "$vcs_mode_file" ]]; then
+      [[ "$(<"$vcs_mode_file")" == "git" ]] \
+        || fail "Legacy overlay VCS metadata is invalid: ${vcs_mode_file}"
+    fi
+
+    print "[${script_name}] Migrating legacy overlay to an immutable lower directory"
+    if [[ -e "$lower_dir" ]]; then
+      validate_immutable_lower
+      vcs_mode="git"
+    else
+      create_immutable_lower git
+    fi
+    write_overlay_metadata
+  else
+    [[ -f "$lower_dir_file" && -f "$vcs_mode_file" ]] \
+      || fail "Overlay immutable-lower metadata is incomplete: ${state_dir}"
+    overlay_lower_dir="$(<"$lower_dir_file")"
+    [[ "$overlay_lower_dir" == "$lower_dir" ]] \
+      || fail "Overlay lower directory is ${overlay_lower_dir}, expected ${lower_dir}."
+    [[ -d "$lower_dir" ]] \
+      || fail "Overlay lower directory is missing: ${lower_dir}"
+    vcs_mode="$(<"$vcs_mode_file")"
+    [[ "$vcs_mode" == "git" || "$vcs_mode" == "jj" ]] \
+      || fail "Overlay has an invalid VCS mode: ${vcs_mode}"
+  fi
+else
+  if [[ -d "${repo_root}/.jj" ]]; then
+    requested_vcs_mode="jj"
+  else
+    requested_vcs_mode="git"
+  fi
+  overlay_base_commit="$base_commit"
+  create_immutable_lower "$requested_vcs_mode"
   print -r -- "$base_commit" >"$base_commit_file"
-  print -r -- "$lower_dir" >"$lower_dir_file"
-  print -r -- "$vcs_mode" >"$vcs_mode_file"
+  write_overlay_metadata
 fi
 
 mountpoint -q "$merged_dir" \
