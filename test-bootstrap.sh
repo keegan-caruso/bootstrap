@@ -97,6 +97,7 @@ EOF
 test_home_manager_migration_safety() {
   local managed_file="${HOME}/.config/starship.toml"
   local fontconfig_file="${HOME}/.config/fontconfig/fonts.conf"
+  local symlink_target="${TEST_ROOT}/user-starship.toml"
 
   mkdir -p "$(dirname "$managed_file")"
   cat >"$managed_file" <<EOF
@@ -120,6 +121,43 @@ EOF
   assert_contains "keep" "$managed_file"
   rm -f "$managed_file"
 
+  cat >"$managed_file" <<EOF
+# >>> ${SCRIPT_MARKER}:config
+managed
+user content after missing end marker
+EOF
+  if (prepare_home_manager_file "$managed_file" "config") >/dev/null 2>&1; then
+    fail_test "Home Manager migration accepted a malformed legacy block"
+  fi
+  assert_contains "user content after missing end marker" "$managed_file"
+  rm -f "$managed_file"
+
+  printf 'user managed\n' >"$symlink_target"
+  ln -s "$symlink_target" "$managed_file"
+  if (prepare_home_manager_file "$managed_file" "config") >/dev/null 2>&1; then
+    fail_test "Home Manager migration accepted a user-managed symlink"
+  fi
+  [[ -L "$managed_file" ]] \
+    || fail_test "Home Manager migration replaced a user-managed symlink"
+  assert_contains "user managed" "$symlink_target"
+  rm -f "$managed_file"
+
+  ln -s "/nix/store/example-package/starship.toml" "$managed_file"
+  if (prepare_home_manager_file "$managed_file" "config") >/dev/null 2>&1; then
+    fail_test "Home Manager migration accepted an arbitrary Nix store symlink"
+  fi
+  [[ -L "$managed_file" ]] \
+    || fail_test "Home Manager migration replaced an arbitrary Nix store symlink"
+  rm -f "$managed_file"
+
+  ln -s \
+    "/nix/store/example-home-manager-files/.config/starship.toml" \
+    "$managed_file"
+  prepare_home_manager_file "$managed_file" "config"
+  [[ -L "$managed_file" ]] \
+    || fail_test "Home Manager migration rejected its own managed symlink"
+  rm -f "$managed_file"
+
   mkdir -p "$(dirname "$fontconfig_file")"
   cat >"$fontconfig_file" <<EOF
 <fontconfig>
@@ -129,9 +167,97 @@ EOF
 <match>keep</match>
 </fontconfig>
 EOF
+  chmod 640 "$fontconfig_file"
   prepare_home_manager_migration
   assert_not_contains "nix-profile-fonts" "$fontconfig_file"
   assert_contains "<match>keep</match>" "$fontconfig_file"
+  [[ "$(stat -c '%a' "$fontconfig_file")" == "640" ]] \
+    || fail_test "Fontconfig migration did not preserve file permissions"
+  finish_home_manager_migration
+}
+
+test_home_manager_activation_rollback() {
+  local managed_file="${HOME}/.config/starship.toml"
+  local failed_activation_package="${TEST_ROOT}/failed-home-manager-generation"
+  local previous_generation="${TEST_ROOT}/previous-home-manager-generation"
+  local rollback_log="${TEST_ROOT}/home-manager-rollback.log"
+  local generation_root="${XDG_STATE_HOME}/home-manager/gcroots/current-home"
+
+  mkdir -p \
+    "$(dirname "$managed_file")" \
+    "$failed_activation_package" \
+    "$previous_generation" \
+    "$(dirname "$generation_root")"
+  cat >"$managed_file" <<EOF
+# >>> ${SCRIPT_MARKER}:config
+managed
+# <<< ${SCRIPT_MARKER}:config
+EOF
+  printf '#!/usr/bin/env bash\nexit 1\n' >"${failed_activation_package}/activate"
+  chmod +x "${failed_activation_package}/activate"
+  printf '#!/usr/bin/env bash\nprintf "rolled back\\n" >%q\n' "$rollback_log" \
+    >"${previous_generation}/activate"
+  chmod +x "${previous_generation}/activate"
+  ln -s "$previous_generation" "$generation_root"
+
+  nix() {
+    if [[ "${1:-}" == "eval" ]]; then
+      printf 'x86_64-linux'
+      return
+    fi
+    printf '%s\n' "$failed_activation_package"
+  }
+
+  IS_WSL=1
+  if (activate_home_manager) >/dev/null 2>&1; then
+    fail_test "Home Manager activation failure was reported as success"
+  fi
+  assert_contains "${SCRIPT_MARKER}:config" "$managed_file"
+  assert_contains "rolled back" "$rollback_log"
+  rm -f "$generation_root"
+}
+
+test_home_manager_activation_signal_rollback() {
+  local managed_file="${HOME}/.config/starship.toml"
+  local interrupted_activation_package="${TEST_ROOT}/interrupted-home-manager-generation"
+
+  mkdir -p "$(dirname "$managed_file")" "$interrupted_activation_package"
+  cat >"$managed_file" <<EOF
+# >>> ${SCRIPT_MARKER}:config
+managed
+# <<< ${SCRIPT_MARKER}:config
+EOF
+  printf '#!/usr/bin/env bash\nkill -TERM "$PPID"\nexit 0\n' \
+    >"${interrupted_activation_package}/activate"
+  chmod +x "${interrupted_activation_package}/activate"
+
+  nix() {
+    if [[ "${1:-}" == "eval" ]]; then
+      printf 'x86_64-linux'
+      return
+    fi
+    printf '%s\n' "$interrupted_activation_package"
+  }
+
+  IS_WSL=1
+  if (activate_home_manager) >/dev/null 2>&1; then
+    fail_test "Interrupted Home Manager activation was reported as success"
+  fi
+  assert_contains "${SCRIPT_MARKER}:config" "$managed_file"
+}
+
+test_malformed_shell_block_safety() {
+  local shell_file="${HOME}/.zshrc"
+
+  cat >"$shell_file" <<EOF
+# >>> ${SCRIPT_MARKER}:path
+managed
+user content after missing end marker
+EOF
+  if (remove_block "$shell_file" "path") >/dev/null 2>&1; then
+    fail_test "Shell migration accepted a malformed managed block"
+  fi
+  assert_contains "user content after missing end marker" "$shell_file"
 }
 
 test_wsl_browser_link_preserves_custom_opener() {
@@ -336,6 +462,9 @@ test_wsl_browser_link_preserves_custom_opener
 test_npm_registry_override
 test_platform_output_selection
 test_home_manager_selection
+test_home_manager_activation_rollback
+test_home_manager_activation_signal_rollback
+test_malformed_shell_block_safety
 test_platform_output_autodetection
 test_git_managed_include
 test_legacy_tool_cleanup

@@ -25,6 +25,9 @@ source "${SCRIPT_DIR}/lib/language-tools.sh"
 # shellcheck source=lib/platform.sh
 # shellcheck disable=SC1091
 source "${SCRIPT_DIR}/lib/platform.sh"
+# shellcheck source=lib/home-manager.sh
+# shellcheck disable=SC1091
+source "${SCRIPT_DIR}/lib/home-manager.sh"
 
 log() {
   printf '[setup-nix] %s\n' "$*"
@@ -37,60 +40,6 @@ fail() {
 
 command_exists() {
   command -v "$1" >/dev/null 2>&1
-}
-
-legacy_file_has_unmanaged_content() {
-  local file="$1"
-  local name="$2"
-  local start="# >>> ${SCRIPT_MARKER}:${name}"
-  local end="# <<< ${SCRIPT_MARKER}:${name}"
-
-  awk -v start="$start" -v end="$end" '
-    $0 == start { in_block = 1; next }
-    $0 == end { in_block = 0; next }
-    !in_block && $0 !~ /^[[:space:]]*$/ { found = 1 }
-    END { exit !found }
-  ' "$file"
-}
-
-prepare_home_manager_file() {
-  local file="$1"
-  local legacy_block="$2"
-
-  [[ -e "$file" || -L "$file" ]] || return 0
-  [[ -L "$file" ]] && return 0
-
-  if legacy_file_has_unmanaged_content "$file" "$legacy_block"; then
-    fail "Cannot migrate ${file}: it contains content outside the legacy managed block."
-  fi
-
-  rm -f "$file"
-}
-
-remove_legacy_fontconfig_block() {
-  local file="${HOME}/.config/fontconfig/fonts.conf"
-  local start="<!-- >>> ${SCRIPT_MARKER}:nix-profile-fonts -->"
-  local end="<!-- <<< ${SCRIPT_MARKER}:nix-profile-fonts -->"
-  local tmp
-
-  [[ -f "$file" ]] || return 0
-
-  tmp="$(mktemp)" || fail "Failed to create temporary file"
-  awk -v start="$start" -v end="$end" '
-    $0 == start { in_block = 1; next }
-    $0 == end { in_block = 0; next }
-    !in_block { print }
-  ' "$file" >"$tmp"
-  mv "$tmp" "$file"
-}
-
-prepare_home_manager_migration() {
-  prepare_home_manager_file "${HOME}/.zshenv" "startup"
-  prepare_home_manager_file "${HOME}/.config/starship.toml" "config"
-  remove_legacy_fontconfig_block
-  if [[ "$IS_WSL" -eq 0 ]]; then
-    prepare_home_manager_file "${HOME}/.config/ghostty/config" "config"
-  fi
 }
 
 ensure_file() {
@@ -109,6 +58,8 @@ upsert_block() {
   local tmp
 
   ensure_file "$file"
+  legacy_markers_are_well_formed "$file" "$start" "$end" \
+    || fail "Cannot update ${file}: its ${name} managed block is malformed."
   tmp="$(mktemp)" || fail "Failed to create temporary file"
 
   (
@@ -169,6 +120,8 @@ remove_block() {
   local tmp
 
   [[ -f "$file" ]] || return
+  legacy_markers_are_well_formed "$file" "$start" "$end" \
+    || fail "Cannot update ${file}: its ${name} managed block is malformed."
   tmp="$(mktemp)" || fail "Failed to create temporary file"
 
   (
@@ -425,32 +378,6 @@ install_dev_tools() {
   export PATH="${PROFILE_PATH}/bin:${PATH}"
 }
 
-activate_home_manager() {
-  local activation_package
-  local current_system
-  local configuration
-  local platform_variant=""
-
-  current_system="$(nix eval --impure --raw --expr builtins.currentSystem)"
-  if [[ "$IS_WSL" -eq 1 ]]; then
-    platform_variant="-wsl"
-  fi
-  configuration="${HOME_MANAGER_USER}@${current_system}${platform_variant}"
-
-  log "Building Home Manager configuration ${configuration}"
-  activation_package="$(
-    nix build \
-      --no-link \
-      --print-out-paths \
-      "${FLAKE_URL}#homeConfigurations.\"${configuration}\".activationPackage"
-  )"
-  [[ -x "${activation_package}/activate" ]] \
-    || fail "Home Manager activation package is missing its activate command."
-
-  log "Activating Home Manager configuration"
-  "${activation_package}/activate"
-}
-
 install_wsl_browser_link() {
   [[ "$IS_WSL" -eq 1 ]] || return
 
@@ -696,7 +623,6 @@ main() {
   install_dev_tools
   install_dotnet_tools
   install_node_tools
-  prepare_home_manager_migration
   activate_home_manager
   install_wsl_browser_link
   link_nix_apps

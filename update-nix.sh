@@ -1,17 +1,23 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+SCRIPT_MARKER="codex-dev-shell"
+IS_WSL=0
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 FLAKE_DIR="${SCRIPT_DIR}/nix"
 FLAKE_URL="path:${FLAKE_DIR}"
 STATE_HOME="${XDG_STATE_HOME:-${HOME}/.local/state}"
 PROFILE_PATH="${STATE_HOME}/nix/profiles/bootstrap"
+HOME_MANAGER_USER="keegancaruso"
 # shellcheck source=lib/platform.sh
 # shellcheck disable=SC1091
 source "${SCRIPT_DIR}/lib/platform.sh"
 # shellcheck source=lib/nix-profile.sh
 # shellcheck disable=SC1091
 source "${SCRIPT_DIR}/lib/nix-profile.sh"
+# shellcheck source=lib/home-manager.sh
+# shellcheck disable=SC1091
+source "${SCRIPT_DIR}/lib/home-manager.sh"
 
 log() {
   printf '[update-nix] %s\n' "$*"
@@ -51,6 +57,9 @@ main() {
   (( $# == 0 )) || fail "Usage: ${0##*/}"
 
   activate_nix
+  if [[ "$(uname -s)" == "Linux" ]] && is_wsl; then
+    IS_WSL=1
+  fi
 
   [[ -f "${FLAKE_DIR}/flake.nix" ]] \
     || fail "Nix flake not found: ${FLAKE_DIR}/flake.nix"
@@ -98,7 +107,11 @@ main() {
     nix profile upgrade --profile "$PROFILE_PATH" --all
   )
 
+  activate_home_manager
+
   log "Update complete. Review and commit nix/flake.lock."
 }
 
-main "$@"
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+  main "$@"
+fi

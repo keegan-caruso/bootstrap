@@ -72,7 +72,8 @@ Run:
 ## `update-nix.sh`
 
 Updates the `nixpkgs` revision pinned by `nix/flake.lock`, checks and builds the
-updated flake, and upgrades the installed development profile generation.
+updated flake, upgrades the installed development profile generation, and
+activates the matching Home Manager generation.
 It activates the installed Nix profile automatically when `nix` is not already
 on `PATH`.
 
