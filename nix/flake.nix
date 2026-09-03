@@ -30,17 +30,6 @@
             config.allowUnfree = true;
           };
           lib = pkgs.lib;
-          gcmWsl = pkgs.writeShellApplication {
-            name = "git-credential-manager-wsl";
-            text = ''
-              if ! command -v git.exe >/dev/null 2>&1; then
-                echo "git-credential-manager-wsl: Git for Windows is not available on PATH" >&2
-                exit 1
-              fi
-
-              exec git.exe credential-manager "$@"
-            '';
-          };
           playwrightFhs = pkgs.buildFHSEnv {
             name = "playwright-fhs";
             targetPkgs =
@@ -175,7 +164,6 @@
               wl-clipboard
             ];
           wslTools = lib.optionals pkgs.stdenv.hostPlatform.isLinux [
-            gcmWsl
             wslview
           ];
           fonts = with pkgs; [

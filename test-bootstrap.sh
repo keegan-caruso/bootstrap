@@ -5,7 +5,7 @@ REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 TEST_ROOT="$(mktemp -d)"
 export HOME="${TEST_ROOT}/home"
 export XDG_STATE_HOME="${TEST_ROOT}/state"
-mkdir -p "$HOME"
+mkdir -p "$HOME" "${XDG_STATE_HOME}/nix/profiles"
 
 cleanup() {
   rm -rf "$TEST_ROOT"
@@ -95,11 +95,17 @@ EOF
 }
 
 test_home_manager_migration_safety() {
+  local home_files="${TEST_ROOT}/migration-home-manager-files"
   local managed_file="${HOME}/.config/starship.toml"
+  local manifest_file="${home_files}/.local/bin/managed-helper"
+  local managed_target="${HOME}/.local/bin/managed-helper"
   local fontconfig_file="${HOME}/.config/fontconfig/fonts.conf"
   local symlink_target="${TEST_ROOT}/user-starship.toml"
 
-  mkdir -p "$(dirname "$managed_file")"
+  mkdir -p \
+    "$(dirname "$managed_file")" \
+    "$(dirname "$manifest_file")" \
+    "$(dirname "$managed_target")"
   cat >"$managed_file" <<EOF
 # >>> ${SCRIPT_MARKER}:config
 managed
@@ -168,17 +174,25 @@ EOF
 </fontconfig>
 EOF
   chmod 640 "$fontconfig_file"
-  prepare_home_manager_migration
+  printf 'managed helper\n' >"$manifest_file"
+  cp "$manifest_file" "$managed_target"
+  prepare_home_manager_migration "$home_files"
   assert_not_contains "nix-profile-fonts" "$fontconfig_file"
   assert_contains "<match>keep</match>" "$fontconfig_file"
   [[ "$(stat -c '%a' "$fontconfig_file")" == "640" ]] \
     || fail_test "Fontconfig migration did not preserve file permissions"
+  [[ ! -e "$managed_target" ]] \
+    || fail_test "Exact legacy managed file was not prepared for Home Manager"
+  restore_home_manager_migration
+  assert_contains "managed helper" "$managed_target"
   finish_home_manager_migration
 }
 
 test_home_manager_activation_rollback() {
   local managed_file="${HOME}/.config/starship.toml"
   local failed_activation_package="${TEST_ROOT}/failed-home-manager-generation"
+  local failed_home_files="${TEST_ROOT}/failed-home-manager-files"
+  local new_managed_file="${HOME}/.config/codex-dev-shell/zshrc"
   local previous_generation="${TEST_ROOT}/previous-home-manager-generation"
   local rollback_log="${TEST_ROOT}/home-manager-rollback.log"
   local generation_root="${XDG_STATE_HOME}/home-manager/gcroots/current-home"
@@ -186,6 +200,7 @@ test_home_manager_activation_rollback() {
   mkdir -p \
     "$(dirname "$managed_file")" \
     "$failed_activation_package" \
+    "${failed_home_files}/.config/codex-dev-shell" \
     "$previous_generation" \
     "$(dirname "$generation_root")"
   cat >"$managed_file" <<EOF
@@ -193,7 +208,14 @@ test_home_manager_activation_rollback() {
 managed
 # <<< ${SCRIPT_MARKER}:config
 EOF
-  printf '#!/usr/bin/env bash\nexit 1\n' >"${failed_activation_package}/activate"
+  printf 'managed by failed generation\n' \
+    >"${failed_home_files}/.config/codex-dev-shell/zshrc"
+  ln -s "$failed_home_files" "${failed_activation_package}/home-files"
+  printf '#!/usr/bin/env bash\nmkdir -p %q\nln -s %q %q\nexit 1\n' \
+    "$(dirname "$new_managed_file")" \
+    "${failed_home_files}/.config/codex-dev-shell/zshrc" \
+    "$new_managed_file" \
+    >"${failed_activation_package}/activate"
   chmod +x "${failed_activation_package}/activate"
   printf '#!/usr/bin/env bash\nprintf "rolled back\\n" >%q\n' "$rollback_log" \
     >"${previous_generation}/activate"
@@ -214,22 +236,45 @@ EOF
   fi
   assert_contains "${SCRIPT_MARKER}:config" "$managed_file"
   assert_contains "rolled back" "$rollback_log"
+  [[ ! -e "$new_managed_file" && ! -L "$new_managed_file" ]] \
+    || fail_test "Failed activation left a newly managed file behind"
   rm -f "$generation_root"
 }
 
 test_home_manager_activation_signal_rollback() {
   local managed_file="${HOME}/.config/starship.toml"
   local interrupted_activation_package="${TEST_ROOT}/interrupted-home-manager-generation"
+  local interrupted_home_files="${TEST_ROOT}/interrupted-home-manager-files"
+  local new_managed_file="${HOME}/.copilot/instructions/test.md"
+  local current_generation_root="${XDG_STATE_HOME}/home-manager/gcroots/current-home"
+  local generation_profile="${XDG_STATE_HOME}/nix/profiles/home-manager"
+  local generation_link="${XDG_STATE_HOME}/nix/profiles/home-manager-1-link"
 
-  mkdir -p "$(dirname "$managed_file")" "$interrupted_activation_package"
+  mkdir -p \
+    "$(dirname "$managed_file")" \
+    "$interrupted_activation_package" \
+    "${interrupted_home_files}/.copilot/instructions"
   cat >"$managed_file" <<EOF
 # >>> ${SCRIPT_MARKER}:config
 managed
 # <<< ${SCRIPT_MARKER}:config
 EOF
-  printf '#!/usr/bin/env bash\nkill -TERM "$PPID"\nexit 0\n' \
+  printf 'managed by interrupted generation\n' \
+    >"${interrupted_home_files}/.copilot/instructions/test.md"
+  printf '#!/usr/bin/env bash\nmkdir -p %q %q\nln -s %q %q\nln -s %q %q\nln -s %q %q\nln -s %q %q\nkill -TERM "$PPID"\nexit 0\n' \
+    "$(dirname "$new_managed_file")" \
+    "$(dirname "$current_generation_root")" \
+    "${interrupted_home_files}/.copilot/instructions/test.md" \
+    "$new_managed_file" \
+    "$interrupted_activation_package" \
+    "$current_generation_root" \
+    "$interrupted_activation_package" \
+    "$generation_link" \
+    "$generation_link" \
+    "$generation_profile" \
     >"${interrupted_activation_package}/activate"
   chmod +x "${interrupted_activation_package}/activate"
+  ln -s "$interrupted_home_files" "${interrupted_activation_package}/home-files"
 
   nix() {
     if [[ "${1:-}" == "eval" ]]; then
@@ -244,6 +289,14 @@ EOF
     fail_test "Interrupted Home Manager activation was reported as success"
   fi
   assert_contains "${SCRIPT_MARKER}:config" "$managed_file"
+  [[ ! -e "$new_managed_file" && ! -L "$new_managed_file" ]] \
+    || fail_test "Interrupted activation left a newly managed file behind"
+  [[ ! -e "$current_generation_root" && ! -L "$current_generation_root" ]] \
+    || fail_test "Interrupted first activation left a current generation root"
+  [[ ! -e "$generation_profile" && ! -L "$generation_profile" ]] \
+    || fail_test "Interrupted first activation left a Home Manager profile"
+  [[ ! -e "$generation_link" && ! -L "$generation_link" ]] \
+    || fail_test "Interrupted first activation left a generation link"
 }
 
 test_malformed_shell_block_safety() {
@@ -351,9 +404,11 @@ test_platform_output_selection() {
 
 test_home_manager_selection() {
   local test_activation_package="${TEST_ROOT}/home-manager-generation"
+  local test_home_files="${TEST_ROOT}/home-manager-files"
   local command_log="${TEST_ROOT}/home-manager.log"
 
-  mkdir -p "$test_activation_package"
+  mkdir -p "$test_activation_package" "$test_home_files"
+  ln -s "$test_home_files" "${test_activation_package}/home-files"
   printf '#!/usr/bin/env bash\nprintf "activated\\\\n" >>%q\n' "$command_log" \
     >"${test_activation_package}/activate"
   chmod +x "${test_activation_package}/activate"

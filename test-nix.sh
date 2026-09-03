@@ -44,7 +44,14 @@ printf 'Evaluating all supported Nix systems\n'
 nix flake check --all-systems --no-build "path:${FLAKE_DIR}"
 
 printf 'Building the current system tool environment\n'
-nix build --no-link "path:${FLAKE_DIR}#$(nix_tool_output)"
+tool_environment="$(
+  nix build --no-link --print-out-paths \
+    "path:${FLAKE_DIR}#$(nix_tool_output)"
+)"
+[[ ! -e "${tool_environment}/bin/git-credential-manager-wsl" ]] || {
+  printf 'WSL credential helper must be owned only by Home Manager\n' >&2
+  exit 1
+}
 
 current_system="$(nix eval --impure --raw --expr builtins.currentSystem)"
 home_variant=""
@@ -52,8 +59,17 @@ if is_wsl; then
   home_variant="-wsl"
 fi
 printf 'Building the current Home Manager configuration\n'
-nix build --no-link \
-  "path:${FLAKE_DIR}#homeConfigurations.\"keegancaruso@${current_system}${home_variant}\".activationPackage"
+home_manager_generation="$(
+  nix build --no-link --print-out-paths \
+    "path:${FLAKE_DIR}#homeConfigurations.\"keegancaruso@${current_system}${home_variant}\".activationPackage"
+)"
+if is_wsl; then
+  home_files="$(readlink "${home_manager_generation}/home-files")"
+  [[ -e "${home_files}/.local/bin/git-credential-manager-wsl" ]] || {
+    printf 'WSL Home Manager configuration is missing its credential helper\n' >&2
+    exit 1
+  }
+fi
 
 if [[ "$(uname -s)" == "Linux" ]]; then
   printf 'Testing the Playwright browser environment\n'

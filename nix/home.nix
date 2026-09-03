@@ -22,7 +22,6 @@ in
     file = {
       ".zshenv" = {
         source = template "zsh/zshenv.sh";
-        force = true;
       };
       ".config/codex-dev-shell/zshrc".text = joinTemplates [
         "zsh/path.sh"
@@ -34,7 +33,6 @@ in
       ".config/codex-dev-shell/bashrc".source = template "bash/aliases.sh";
       ".config/starship.toml" = {
         source = template "starship.toml";
-        force = true;
       };
       ".config/git/bootstrap.config".text = ''
         [core]
@@ -55,30 +53,25 @@ in
       '';
       ".copilot/instructions/playwright.instructions.md" = {
         source = template "copilot/playwright.instructions.md";
-        force = true;
       };
       ".local/bin/typescript-language-server" = {
         source = template "typescript-language-server";
         executable = true;
-        force = true;
       };
     }
     // lib.optionalAttrs (!isWsl) {
       ".config/ghostty/config" = {
         source = template "ghostty/config";
-        force = true;
       };
     }
     // lib.optionalAttrs isWsl {
       ".local/bin/git-credential-manager-wsl" = {
         source = template "git-credential-manager-wsl";
         executable = true;
-        force = true;
       };
       ".local/bin/wsl-browser" = {
         source = template "wsl-browser";
         executable = true;
-        force = true;
       };
     };
   };
