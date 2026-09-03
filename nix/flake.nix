@@ -120,6 +120,7 @@
               dotnetSdk
             ]
             ++ lib.optionals pkgs.stdenv.hostPlatform.isLinux [
+              bubblewrap
               fuse-overlayfs
               util-linux
               wl-clipboard

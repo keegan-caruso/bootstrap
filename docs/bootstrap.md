@@ -75,7 +75,8 @@ The pinned nixpkgs revision no longer supports Intel macOS.
 
 Ubuntu uses apt only for host integration prerequisites such as CA
 certificates, the Nix installer, and Secret Service support. Development tools
-come from the pinned Nix flake.
+come from the pinned Nix flake, including Bubblewrap for Copilot CLI command
+sandboxing.
 
 When Nix is absent, the bootstrap downloads the pinned Determinate Nix
 installer release and verifies its published SHA-256 digest before running it.
