@@ -138,9 +138,18 @@ mountpoint -q "$merged_dir" \
 
 mounted=0
 cleanup() {
-  if (( mounted )) && ! fusermount3 -u "$merged_dir"; then
-    print -u2 "[${script_name}] Failed to unmount overlay: ${merged_dir}"
-  fi
+  local attempt
+
+  (( mounted )) || return
+  cd /
+
+  for attempt in {1..5}; do
+    mountpoint -q "$merged_dir" || return
+    fusermount3 -u "$merged_dir" 2>/dev/null && return
+    sleep 0.1
+  done
+
+  print -u2 "[${script_name}] Failed to unmount overlay: ${merged_dir}"
 }
 trap cleanup EXIT
 trap 'exit 129' HUP
@@ -171,11 +180,13 @@ print "[${script_name}] Branch: ${branch_name}"
 print "[${script_name}] Scope: ${scope_name}"
 print "[${script_name}] Starting: ${(q)command_args}"
 
-cd "$merged_dir"
-systemd-run \
-  --user \
-  --scope \
-  --collect \
-  --unit="$scope_name" \
-  -- \
-  "${command_args[@]}"
+(
+  cd "$merged_dir"
+  exec systemd-run \
+    --user \
+    --scope \
+    --collect \
+    --unit="$scope_name" \
+    -- \
+    "${command_args[@]}"
+)
