@@ -1,5 +1,30 @@
 #!/usr/bin/env bash
 
+install_dotnet_tools() {
+  local tool_path="${HOME}/.local/bin"
+
+  command_exists dotnet || fail "dotnet is required to install .NET tools."
+  mkdir -p "$tool_path"
+
+  if dotnet tool list --tool-path "$tool_path" \
+    | awk 'NR > 2 { print tolower($1) }' \
+    | grep -Fxq "${NUGET_CREDENTIAL_PROVIDER_PACKAGE,,}"; then
+    log "Updating the Azure Artifacts NuGet credential provider"
+    dotnet tool update \
+      --tool-path "$tool_path" \
+      --version "$NUGET_CREDENTIAL_PROVIDER_VERSION" \
+      --source "$NUGET_PUBLIC_SOURCE" \
+      "$NUGET_CREDENTIAL_PROVIDER_PACKAGE"
+  else
+    log "Installing the Azure Artifacts NuGet credential provider"
+    dotnet tool install \
+      --tool-path "$tool_path" \
+      --version "$NUGET_CREDENTIAL_PROVIDER_VERSION" \
+      --source "$NUGET_PUBLIC_SOURCE" \
+      "$NUGET_CREDENTIAL_PROVIDER_PACKAGE"
+  fi
+}
+
 install_node_tools() {
   local node_version
   local npm_registry

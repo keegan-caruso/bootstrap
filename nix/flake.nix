@@ -32,16 +32,52 @@
               exec git.exe credential-manager "$@"
             '';
           };
-          agency = pkgs.writeShellApplication {
-            name = "agency";
+          playwrightFhs = pkgs.buildFHSEnv {
+            name = "playwright-fhs";
+            targetPkgs =
+              fhsPkgs: with fhsPkgs; [
+                alsa-lib
+                at-spi2-atk
+                atk
+                cairo
+                cups
+                dbus
+                expat
+                fontconfig
+                freetype
+                glib
+                gtk3
+                libdrm
+                libgbm
+                libx11
+                libxcb
+                libxcomposite
+                libxdamage
+                libxext
+                libxfixes
+                libxkbcommon
+                libxrandr
+                mesa
+                nspr
+                nss
+                pango
+                systemd
+              ];
+            runScript = "bash";
+            privateTmp = false;
+          };
+          playwrightRun = pkgs.writeShellApplication {
+            name = "playwright-run";
             text = ''
-              agency_bin="$HOME/.config/agency/CurrentVersion/agency"
-              if [[ ! -x "$agency_bin" ]]; then
-                echo "agency: executable not found: $agency_bin" >&2
-                exit 1
+              if (( $# == 0 )); then
+                echo "Usage: playwright-run <command> [args...]" >&2
+                echo "Example: playwright-run pnpm exec playwright test" >&2
+                exit 2
               fi
 
-              exec "$agency_bin" "$@"
+              export PLAYWRIGHT_BROWSERS_PATH="''${PLAYWRIGHT_BROWSERS_PATH:-$HOME/.cache/ms-playwright}"
+              exec ${playwrightFhs}/bin/playwright-fhs \
+                -c 'exec "$@"' playwright-run "$@"
             '';
           };
           wslview = pkgs.writeShellApplication {
@@ -75,6 +111,7 @@
           cliTools =
             with pkgs;
             [
+              azure-cli
               bat
               bottom
               cmark
@@ -122,6 +159,7 @@
             ++ lib.optionals pkgs.stdenv.hostPlatform.isLinux [
               bubblewrap
               fuse-overlayfs
+              playwrightRun
               powershell
               util-linux
               wl-clipboard
@@ -141,11 +179,11 @@
         in
         {
           inherit
-            agency
             cliTools
             desktopTools
             fonts
             pkgs
+            playwrightRun
             wslTools
             ;
           default = pkgs.buildEnv {
@@ -182,7 +220,7 @@
         in
         {
           default = p.pkgs.mkShell {
-            packages = p.cliTools ++ p.fonts ++ [ p.agency ];
+            packages = p.cliTools ++ p.fonts;
           };
         }
       );

@@ -73,15 +73,19 @@ EOF
   write_zshrc_blocks
   write_starship_config
   write_ghostty_config
+  install_copilot_instructions
 
   assert_contains "keep-before" "${HOME}/.zprofile"
   assert_contains "keep-after" "${HOME}/.zprofile"
   assert_not_contains "${SCRIPT_MARKER}:homebrew" "${HOME}/.zprofile"
   assert_marker_once "# >>> ${SCRIPT_MARKER}:startup" "${HOME}/.zshenv"
   assert_marker_once "# >>> ${SCRIPT_MARKER}:path" "${HOME}/.zshrc"
+  assert_contains 'path=("${(@)path:#/mnt/*/*Microsoft VS Code*/bin}")' "${HOME}/.zshrc"
   assert_contains "artifacts-npm-credprovider markdownlint-cli2" "${HOME}/.zshrc"
   assert_marker_once "# >>> ${SCRIPT_MARKER}:config" "${HOME}/.config/starship.toml"
   assert_marker_once "# >>> ${SCRIPT_MARKER}:config" "${HOME}/.config/ghostty/config"
+  assert_contains "playwright-run pnpm exec playwright test" \
+    "${HOME}/.copilot/instructions/playwright.instructions.md"
 
   cp -R "$HOME" "$first_run"
 
@@ -90,6 +94,7 @@ EOF
   write_zshrc_blocks
   write_starship_config
   write_ghostty_config
+  install_copilot_instructions
 
   diff -ru "$first_run" "$HOME" \
     || fail_test "Managed configuration changed on the second run"

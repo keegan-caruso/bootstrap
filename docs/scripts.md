@@ -31,6 +31,8 @@ without replacing unrelated settings. The policy:
 - enables command sandboxing and disables per-command bypass
 - allows the working directory, developer tools, outbound traffic, and
   localhost development services
+- grants read-only access to the Nix store and Copilot package cache
+- grants read-write access to the Playwright browser cache
 - injects Git and GitHub authentication into sandboxed commands
 - sandboxes LSP servers
 - denies access to `/mnt/c`
@@ -41,7 +43,7 @@ Run:
 ./configure-copilot-sandbox.sh
 ```
 
-The script is idempotent and preserves existing denied paths. Set
+The script is idempotent and preserves existing filesystem paths. Set
 `COPILOT_SETTINGS_FILE` to configure a different settings file.
 
 ## `configure-zellij.sh`
@@ -133,16 +135,10 @@ the sibling `<repository>.worktrees/` directory. Git repositories receive a
 branch named `user/keegancaruso/<overlay-name>`. Colocated Jujutsu repositories
 receive a bookmark with that name.
 
-Start Agency Copilot from within a repository:
-
-```zsh
-/path/to/bootstrap/nix-wt issue-123 -- agency cp
-```
-
 Run for an explicit repository:
 
 ```zsh
-./nix-wt issue-123 -C /path/to/repository -- agency cp
+./nix-wt issue-123 -C /path/to/repository -- zsh
 ```
 
 Run another command:
@@ -203,6 +199,5 @@ security sandbox: the launched command can still access other paths permitted
 to the user. Copilot's MXC policy provides that separate security boundary.
 
 The name must start with a letter or number and may contain letters, numbers,
-dots, underscores, and hyphens. The Nix dev shell provides `fuse-overlayfs`,
-mount utilities, and an `agency` wrapper for
-`~/.config/agency/CurrentVersion/agency`.
+dots, underscores, and hyphens. The Nix dev shell provides `fuse-overlayfs`
+and the required mount utilities.

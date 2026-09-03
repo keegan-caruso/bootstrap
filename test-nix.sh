@@ -46,4 +46,13 @@ nix flake check --all-systems --no-build "path:${FLAKE_DIR}"
 printf 'Building the current system tool environment\n'
 nix build --no-link "path:${FLAKE_DIR}#$(nix_tool_output)"
 
+if [[ "$(uname -s)" == "Linux" ]]; then
+  printf 'Testing the Playwright browser environment\n'
+  nix develop "path:${FLAKE_DIR}" --command playwright-run bash -c '
+    test "$PLAYWRIGHT_BROWSERS_PATH" = "$HOME/.cache/ms-playwright"
+    ldconfig -p | grep -q "libgbm.so.1"
+    ldconfig -p | grep -q "libnss3.so"
+  '
+fi
+
 printf 'Nix bootstrap checks passed\n'

@@ -3,6 +3,9 @@ set -euo pipefail
 
 SETTINGS_FILE="${COPILOT_SETTINGS_FILE:-${HOME}/.copilot/settings.json}"
 DENIED_PATH="/mnt/c"
+READONLY_PATH="${COPILOT_PACKAGE_CACHE_PATH:-${HOME}/.cache/copilot/pkg}"
+NIX_STORE_PATH="${NIX_STORE_PATH:-/nix/store}"
+READWRITE_PATH="${PLAYWRIGHT_BROWSER_CACHE_PATH:-${HOME}/.cache/ms-playwright}"
 LOCK_DIR="${SETTINGS_FILE}.lock.d"
 TMP_FILE=""
 LOCK_ACQUIRED=0
@@ -54,16 +57,32 @@ jq_filter='
   | .sandbox.sandboxLspServers = true
   | .sandbox.userPolicy.filesystem.deniedPaths =
       (((.sandbox.userPolicy.filesystem.deniedPaths // []) + [$denied_path]) | unique)
+  | .sandbox.userPolicy.filesystem.readonlyPaths =
+      (((.sandbox.userPolicy.filesystem.readonlyPaths // [])
+        + [$readonly_path, $nix_store_path]) | unique)
+  | .sandbox.userPolicy.filesystem.readwritePaths =
+      (((.sandbox.userPolicy.filesystem.readwritePaths // []) + [$readwrite_path]) | unique)
   | .sandbox.userPolicy.filesystem.clearPolicyOnExit = false
   | .sandbox.userPolicy.network.allowOutbound = true
   | .sandbox.userPolicy.network.allowLocalNetwork = true
 '
 
 if [[ -f "$SETTINGS_FILE" ]]; then
-  jq --arg denied_path "$DENIED_PATH" "$jq_filter" "$SETTINGS_FILE" >"$TMP_FILE" \
+  jq \
+    --arg denied_path "$DENIED_PATH" \
+    --arg readonly_path "$READONLY_PATH" \
+    --arg nix_store_path "$NIX_STORE_PATH" \
+    --arg readwrite_path "$READWRITE_PATH" \
+    "$jq_filter" "$SETTINGS_FILE" >"$TMP_FILE" \
     || fail "Existing Copilot settings are not valid JSON objects: ${SETTINGS_FILE}"
 else
-  jq --null-input --arg denied_path "$DENIED_PATH" "{} | ${jq_filter}" >"$TMP_FILE"
+  jq \
+    --null-input \
+    --arg denied_path "$DENIED_PATH" \
+    --arg readonly_path "$READONLY_PATH" \
+    --arg nix_store_path "$NIX_STORE_PATH" \
+    --arg readwrite_path "$READWRITE_PATH" \
+    "{} | ${jq_filter}" >"$TMP_FILE"
 fi
 
 chmod 0600 "$TMP_FILE"
@@ -72,3 +91,6 @@ TMP_FILE=""
 
 log "Configured the global Copilot sandbox policy in ${SETTINGS_FILE}"
 log "Denied path: ${DENIED_PATH}"
+log "Read-only path: ${READONLY_PATH}"
+log "Read-only path: ${NIX_STORE_PATH}"
+log "Read-write path: ${READWRITE_PATH}"

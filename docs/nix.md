@@ -8,7 +8,7 @@ development environment.
 - `default`: CLI tools and fonts, used on WSL
 - `workstation`: CLI tools, fonts, and Ghostty, used on native Linux and macOS
 - `desktop`: Ghostty only
-- `devShell`: the CLI environment plus the local `agency` wrapper
+- `devShell`: the CLI environment used by `nix-wt`
 
 Supported Nix systems are `x86_64-linux`, `aarch64-linux`, and
 `aarch64-darwin`.

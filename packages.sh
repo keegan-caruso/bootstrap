@@ -2,6 +2,9 @@
 # shellcheck disable=SC2034
 
 ARTIFACTS_NPM_REGISTRY="https://pkgs.dev.azure.com/artifacts-public/23934c1b-a3b5-4b70-9dd3-d1bef4cc72a0/_packaging/AzureArtifacts/npm/registry/"
+NUGET_PUBLIC_SOURCE="https://api.nuget.org/v3/index.json"
+NUGET_CREDENTIAL_PROVIDER_PACKAGE="Microsoft.Artifacts.CredentialProvider.NuGet.Tool"
+NUGET_CREDENTIAL_PROVIDER_VERSION="2.0.4"
 
 MICROSOFT_NPM_GLOBAL_PACKAGES=(
   @microsoft/artifacts-npm-credprovider@1.1.4

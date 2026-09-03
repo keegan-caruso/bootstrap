@@ -50,6 +50,7 @@ Excluded here:
 - [shellcheck](shellcheck.md)
 - [shfmt](shfmt.md)
 - [PowerShell](powershell.md)
+- [Playwright](playwright.md)
 - [yamllint](yamllint.md)
 
 ## Git-Adjacent and Review Tools

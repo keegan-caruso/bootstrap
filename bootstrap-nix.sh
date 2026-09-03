@@ -601,6 +601,15 @@ write_ghostty_config() {
     "$(read_template "${SCRIPT_DIR}/templates/ghostty/config")"
 }
 
+install_copilot_instructions() {
+  local instructions_dir="${HOME}/.copilot/instructions"
+
+  mkdir -p "$instructions_dir"
+  install -m 0644 \
+    "${SCRIPT_DIR}/templates/copilot/playwright.instructions.md" \
+    "${instructions_dir}/playwright.instructions.md"
+}
+
 prompt_for_git_email() {
   local input
 
@@ -689,6 +698,7 @@ main() {
   install_nix
   source_nix
   install_dev_tools
+  install_dotnet_tools
   install_node_tools
   register_nix_profile_fonts
   link_nix_apps
@@ -703,6 +713,7 @@ main() {
   fi
   write_starship_config
   write_ghostty_config
+  install_copilot_instructions
   configure_git
   write_jj_config
   remove_legacy_profile_entries
