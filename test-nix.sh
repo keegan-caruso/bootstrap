@@ -31,6 +31,9 @@ printf 'Testing bootstrap behavior with an isolated HOME\n'
 printf 'Testing Copilot sandbox configuration\n'
 "${SCRIPT_DIR}/test-copilot-sandbox.sh"
 
+printf 'Testing immutable overlay lower directories\n'
+"${SCRIPT_DIR}/test-nix-wt.sh"
+
 printf 'Checking Nix formatting\n'
 (
   cd "$FLAKE_DIR"

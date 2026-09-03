@@ -128,9 +128,10 @@ given command inside it through the bootstrap repository's Nix dev shell.
 By default, the launcher uses the repository containing the current directory.
 An explicit repository path can be passed with `-C`. Each overlay receives a
 persistent writable layer under a repository-specific directory in
-`${XDG_STATE_HOME:-~/.local/state}/nix-wt/` and a branch named
-`user/keegancaruso/<overlay-name>`. The source checkout is the read-only lower
-layer and must be clean.
+`${XDG_STATE_HOME:-~/.local/state}/nix-wt/` and an immutable base checkout under
+the sibling `<repository>.worktrees/` directory. Git repositories receive a
+branch named `user/keegancaruso/<overlay-name>`. Colocated Jujutsu repositories
+receive a bookmark with that name.
 
 Start Agency Copilot from within a repository:
 
@@ -157,19 +158,40 @@ process; normal Zsh sessions do not activate Nix through the bootstrap template.
 This creates:
 
 ```text
+Lower:   <repository>.worktrees/nix-wt-issue-123
 Overlay: ~/.local/state/nix-wt/<repo-name>-<repo-id>/issue-123/merged
 State:   ~/.local/state/nix-wt/<repo-name>-<repo-id>/issue-123
-Branch:  user/keegancaruso/issue-123
+Branch or bookmark: user/keegancaruso/issue-123
 ```
 
 The overlay is unmounted when the command exits, while its writable layer
 remains available for another `nix-wt` session with the same repository and
-overlay name. The launcher records the repository path to verify the state
-belongs to the expected checkout. It also records the base commit and refuses
-to reopen the overlay if the source checkout has moved; use a new overlay name
-in that case. Commits and refs created in the overlay remain in its writable
-layer, so push the branch before deleting that state. Do not change the source
-checkout while overlays are mounted.
+overlay name. The lower checkout remains fixed at the commit from which the
+overlay was created, so the source checkout can advance without changing an
+active or persisted overlay. The launcher records the repository, lower
+directory, base commit, and VCS mode to validate reopened state.
+
+For colocated Jujutsu repositories, the lower checkout is an independent local
+clone initialized with its own `.git` and `.jj` metadata. This is used instead
+of a linked Git worktree because Jujutsu does not support colocated
+initialization inside linked Git worktrees. Git objects are copied so later
+maintenance or garbage collection in the source checkout cannot invalidate a
+persisted overlay. Refs, indexes, and Jujutsu operations also remain isolated.
+
+State created by older versions does not have an immutable lower directory and
+is refused. To recover one temporarily, mount it manually using its original
+source checkout as the lower directory:
+
+```bash
+fuse-overlayfs \
+  -o lowerdir=/path/to/repository,upperdir=/path/to/state/upper,workdir=/path/to/state/work \
+  /path/to/state/merged
+```
+
+Push the old branch or bookmark, unmount it with
+`fusermount3 -u /path/to/state/merged`, and create a new overlay name. Commits
+and refs created in a new overlay remain in its writable layer, so push the
+branch or bookmark before deleting its state and lower checkout.
 
 The command runs in a collectible systemd user scope named
 `nix-wt-<repo-name>-<repo-id>-<overlay-name>.scope`. The scope is removed after
@@ -178,7 +200,7 @@ unmount the merged filesystem afterward.
 
 OverlayFS isolates writes made through the merged directory, but it is not a
 security sandbox: the launched command can still access other paths permitted
-to the user.
+to the user. Copilot's MXC policy provides that separate security boundary.
 
 The name must start with a letter or number and may contain letters, numbers,
 dots, underscores, and hyphens. The Nix dev shell provides `fuse-overlayfs`,

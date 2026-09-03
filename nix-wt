@@ -80,7 +80,7 @@ if [[ "${NIX_WT_IN_NIX:-0}" != 1 ]]; then
     --command env NIX_WT_IN_NIX=1 "$script_path" "${original_args[@]}"
 fi
 
-for required_command in cksum fuse-overlayfs fusermount3 git mountpoint systemd-run; do
+for required_command in cksum flock fuse-overlayfs fusermount3 git mountpoint systemd-run; do
   command -v "$required_command" >/dev/null 2>&1 \
     || fail "Required command not found in the Nix dev shell: ${required_command}"
 done
@@ -109,13 +109,23 @@ state_dir="${XDG_STATE_HOME:-${HOME}/.local/state}/nix-wt/${repo_key}/${overlay_
 upper_dir="${state_dir}/upper"
 work_dir="${state_dir}/work"
 merged_dir="${state_dir}/merged"
+lower_parent="${repo_root}.worktrees"
+lower_dir="${lower_parent}/nix-wt-${overlay_name}"
 base_commit_file="${state_dir}/base-commit"
 repo_root_file="${state_dir}/repo-root"
+lower_dir_file="${state_dir}/lower-dir"
+vcs_mode_file="${state_dir}/vcs-mode"
+session_lock_file="${state_dir}/session.lock"
+lower_staging_dir="${lower_dir}.creating.$$"
 scope_name="nix-wt-${repo_key}-${overlay_name}.scope"
 (( ${#scope_name} <= 255 )) \
   || fail "Repository and overlay names produce a systemd scope name longer than 255 characters."
 
 mkdir -p "$upper_dir" "$work_dir" "$merged_dir"
+
+exec {session_lock_fd}>"$session_lock_file"
+flock -n "$session_lock_fd" \
+  || fail "Overlay is already starting or running: ${merged_dir}"
 
 if [[ -f "$repo_root_file" ]]; then
   overlay_repo_root="$(<"$repo_root_file")"
@@ -127,10 +137,53 @@ fi
 
 if [[ -f "$base_commit_file" ]]; then
   overlay_base_commit="$(<"$base_commit_file")"
-  [[ "$overlay_base_commit" == "$base_commit" ]] \
-    || fail "Overlay was created from ${overlay_base_commit}; repository is now at ${base_commit}. Use a new overlay name."
+  [[ -f "$lower_dir_file" && -f "$vcs_mode_file" ]] \
+    || fail "Overlay predates immutable lower directories. Push any work and use a new overlay name: ${overlay_name}"
+  overlay_lower_dir="$(<"$lower_dir_file")"
+  [[ "$overlay_lower_dir" == "$lower_dir" ]] \
+    || fail "Overlay lower directory is ${overlay_lower_dir}, expected ${lower_dir}."
+  [[ -d "$lower_dir" ]] \
+    || fail "Overlay lower directory is missing: ${lower_dir}"
+  vcs_mode="$(<"$vcs_mode_file")"
+  [[ "$vcs_mode" == "git" || "$vcs_mode" == "jj" ]] \
+    || fail "Overlay has an invalid VCS mode: ${vcs_mode}"
 else
+  [[ ! -e "$lower_dir" ]] \
+    || fail "Lower directory already exists without matching overlay state: ${lower_dir}"
+  [[ ! -e "$lower_staging_dir" ]] \
+    || fail "Lower-directory staging path already exists: ${lower_staging_dir}"
+
+  mkdir -p "$lower_parent"
+  lower_ready=0
+  cleanup_lower_staging() {
+    (( lower_ready )) || rm -rf -- "$lower_staging_dir"
+  }
+  trap cleanup_lower_staging EXIT
+
+  git clone --quiet --no-hardlinks --no-checkout "$repo_root" "$lower_staging_dir"
+  git -C "$lower_staging_dir" checkout --quiet --detach "$base_commit"
+
+  origin_url="$(git -C "$repo_root" remote get-url origin 2>/dev/null || true)"
+  if [[ -n "$origin_url" ]]; then
+    git -C "$lower_staging_dir" remote set-url origin "$origin_url"
+  fi
+
+  if [[ -d "${repo_root}/.jj" ]]; then
+    command -v jj >/dev/null 2>&1 \
+      || fail "Jujutsu is required for the source repository: ${repo_root}"
+    jj git init --colocate "$lower_staging_dir" >/dev/null
+    vcs_mode="jj"
+  else
+    vcs_mode="git"
+  fi
+
+  mv -- "$lower_staging_dir" "$lower_dir"
+  lower_ready=1
+  trap - EXIT
+
   print -r -- "$base_commit" >"$base_commit_file"
+  print -r -- "$lower_dir" >"$lower_dir_file"
+  print -r -- "$vcs_mode" >"$vcs_mode_file"
 fi
 
 mountpoint -q "$merged_dir" \
@@ -157,26 +210,33 @@ trap 'exit 130' INT
 trap 'exit 143' TERM
 
 fuse-overlayfs \
-  -o "lowerdir=${repo_root},upperdir=${upper_dir},workdir=${work_dir}" \
+  -o "lowerdir=${lower_dir},upperdir=${upper_dir},workdir=${work_dir}" \
   "$merged_dir"
 mounted=1
 mountpoint -q "$merged_dir" || fail "Overlay mount failed: ${merged_dir}"
 
-if git -C "$merged_dir" show-ref --verify --quiet "refs/heads/${branch_name}"; then
-  git -C "$merged_dir" switch "$branch_name"
+if [[ "$vcs_mode" == "jj" ]]; then
+  jj -R "$merged_dir" bookmark set "$branch_name" -r '@'
+  vcs_label="Bookmark"
 else
-  git -C "$merged_dir" switch -c "$branch_name"
+  if git -C "$merged_dir" show-ref --verify --quiet "refs/heads/${branch_name}"; then
+    git -C "$merged_dir" switch "$branch_name"
+  else
+    git -C "$merged_dir" switch -c "$branch_name"
+  fi
+
+  current_branch="$(git -C "$merged_dir" symbolic-ref --quiet --short HEAD 2>/dev/null)" \
+    || fail "Overlay repository is not on a branch."
+  [[ "$current_branch" == "$branch_name" ]] \
+    || fail "Overlay uses '${current_branch}', expected '${branch_name}'."
+  vcs_label="Branch"
 fi
 
-current_branch="$(git -C "$merged_dir" symbolic-ref --quiet --short HEAD 2>/dev/null)" \
-  || fail "Overlay repository is not on a branch."
-[[ "$current_branch" == "$branch_name" ]] \
-  || fail "Overlay uses '${current_branch}', expected '${branch_name}'."
-
 print "[${script_name}] Repository: ${repo_root}"
+print "[${script_name}] Lower: ${lower_dir}"
 print "[${script_name}] Overlay: ${merged_dir}"
 print "[${script_name}] State: ${state_dir}"
-print "[${script_name}] Branch: ${branch_name}"
+print "[${script_name}] ${vcs_label}: ${branch_name}"
 print "[${script_name}] Scope: ${scope_name}"
 print "[${script_name}] Starting: ${(q)command_args}"
 
