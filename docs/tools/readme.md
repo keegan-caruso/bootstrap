@@ -49,6 +49,7 @@ Excluded here:
 - [fontconfig](fontconfig.md)
 - [shellcheck](shellcheck.md)
 - [shfmt](shfmt.md)
+- [PowerShell](powershell.md)
 - [yamllint](yamllint.md)
 
 ## Git-Adjacent and Review Tools

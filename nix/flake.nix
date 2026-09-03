@@ -122,6 +122,7 @@
             ++ lib.optionals pkgs.stdenv.hostPlatform.isLinux [
               bubblewrap
               fuse-overlayfs
+              powershell
               util-linux
               wl-clipboard
             ];
