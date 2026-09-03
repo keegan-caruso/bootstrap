@@ -84,7 +84,8 @@ installer release and verifies its published SHA-256 digest before running it.
 
 WSL additionally configures systemd, editor/watch limits, browser integration,
 and Windows Git Credential Manager. It does not install Ghostty. VS Code is not
-installed or configured on any platform.
+installed or configured on any platform. The managed WSL shell path excludes
+the Windows VS Code CLI while preserving other Windows interoperability paths.
 
 ## Configuration
 
