@@ -43,6 +43,10 @@ install_node_tools() {
   npm uninstall -g typescript-language-server
 
   log "Installing global Node.js tools"
+  npm install -g \
+    --allow-scripts=@microsoft/artifacts-credprovider-wrapper \
+    --registry="$ARTIFACTS_NPM_REGISTRY" \
+    "${MICROSOFT_NPM_GLOBAL_PACKAGES[@]}"
   npm install -g "${NPM_GLOBAL_PACKAGES[@]}"
 
   mkdir -p "${HOME}/.local/bin"

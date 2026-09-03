@@ -9,7 +9,7 @@ if [[ -n "$_fnm_binary" ]]; then
   _fnm_lazy_commands=(
     fnm node npm npx corepack pnpm pnpx yarn yarnpkg
     tsc typescript-language-server
-    markdownlint-cli2 oxfmt oxlint
+    artifacts-npm-credprovider markdownlint-cli2 oxfmt oxlint
   )
 
   _fnm_define_lazy_wrappers() {

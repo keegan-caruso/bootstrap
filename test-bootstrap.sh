@@ -79,6 +79,7 @@ EOF
   assert_not_contains "${SCRIPT_MARKER}:homebrew" "${HOME}/.zprofile"
   assert_marker_once "# >>> ${SCRIPT_MARKER}:startup" "${HOME}/.zshenv"
   assert_marker_once "# >>> ${SCRIPT_MARKER}:path" "${HOME}/.zshrc"
+  assert_contains "artifacts-npm-credprovider markdownlint-cli2" "${HOME}/.zshrc"
   assert_marker_once "# >>> ${SCRIPT_MARKER}:config" "${HOME}/.config/starship.toml"
   assert_marker_once "# >>> ${SCRIPT_MARKER}:config" "${HOME}/.config/ghostty/config"
 
@@ -138,6 +139,9 @@ test_npm_registry_override() {
 
   assert_contains "registry=https://registry.example.test/" "$npm_log"
   assert_contains "npm uninstall -g typescript-language-server" "$npm_log"
+  assert_contains \
+    "npm install -g --allow-scripts=@microsoft/artifacts-credprovider-wrapper --registry=${ARTIFACTS_NPM_REGISTRY} ${MICROSOFT_NPM_GLOBAL_PACKAGES[*]}" \
+    "$npm_log"
   assert_contains "npm install -g ${NPM_GLOBAL_PACKAGES[*]}" "$npm_log"
   [[ -x "${HOME}/.local/bin/typescript-language-server" ]] \
     || fail_test "TypeScript language server wrapper was not installed"

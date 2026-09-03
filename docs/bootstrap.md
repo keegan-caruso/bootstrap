@@ -26,10 +26,15 @@ Nix is the source of truth for native tools, including:
 The bootstrap uses `fnm` from Nix to install Node.js LTS. npm owns the tools
 that are distributed natively through npm:
 
+- `@microsoft/artifacts-npm-credprovider@1.1.4`
 - `typescript@7.0.2`
 - `markdownlint-cli2@0.23.2`
 - `oxfmt@0.66.0`
 - `oxlint@1.81.0`
+
+The Artifacts npm credential provider is installed from Microsoft's public
+Azure Artifacts feed. Other npm tools continue to use the registry resolved
+from the user's npm configuration or `BOOTSTRAP_NPM_REGISTRY`.
 
 The installed `typescript-language-server` compatibility command runs
 TypeScript 7's native `tsc --lsp` mode.
