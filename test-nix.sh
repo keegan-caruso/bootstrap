@@ -28,6 +28,9 @@ command -v nix >/dev/null 2>&1 || {
 printf 'Testing bootstrap behavior with an isolated HOME\n'
 "${SCRIPT_DIR}/test-bootstrap.sh"
 
+printf 'Testing Copilot sandbox configuration\n'
+"${SCRIPT_DIR}/test-copilot-sandbox.sh"
+
 printf 'Checking Nix formatting\n'
 (
   cd "$FLAKE_DIR"

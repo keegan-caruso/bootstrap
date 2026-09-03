@@ -35,6 +35,12 @@ Configure Zellij:
 ./configure-zellij.sh
 ```
 
+Configure the global Copilot CLI sandbox:
+
+```bash
+./configure-copilot-sandbox.sh
+```
+
 Launch WSL from Windows Terminal:
 
 ```powershell

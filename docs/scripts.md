@@ -23,6 +23,27 @@ Run:
 `bootstrap-dev-shell.sh` and `bootstrap-wsl-nix.sh` delegate to this command
 for compatibility.
 
+## `configure-copilot-sandbox.sh`
+
+Merges the global Copilot CLI MXC policy into `~/.copilot/settings.json`
+without replacing unrelated settings. The policy:
+
+- enables command sandboxing and disables per-command bypass
+- allows the working directory, developer tools, outbound traffic, and
+  localhost development services
+- injects Git and GitHub authentication into sandboxed commands
+- sandboxes LSP servers
+- denies access to `/mnt/c`
+
+Run:
+
+```bash
+./configure-copilot-sandbox.sh
+```
+
+The script is idempotent and preserves existing denied paths. Set
+`COPILOT_SETTINGS_FILE` to configure a different settings file.
+
 ## `configure-zellij.sh`
 
 Writes a managed `~/.config/zellij/config.kdl`.
