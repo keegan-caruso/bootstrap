@@ -21,7 +21,7 @@ Nix is the source of truth for native tools, including:
 - Python tools including `uv`, `ruff`, and `ty`
 - Rust-based tools including `rust-analyzer`, `bottom`, `dust`, `taplo`,
   `tokei`, and Zellij
-- JetBrains Mono Nerd Font, Symbols Nerd Font, and Symbola
+- Ubuntu Mono, Symbols Nerd Font, and Symbola
 - Ghostty on native Linux and Apple Silicon macOS
 
 The bootstrap uses `fnm` from Nix to install Node.js LTS. npm owns the tools
@@ -91,12 +91,19 @@ the Windows VS Code CLI while preserving other Windows interoperability paths.
 
 The bootstrap writes managed blocks into:
 
-- `~/.zshenv`
 - `~/.zshrc`
 - `~/.bashrc` on WSL
+- `~/.config/jj/config.toml`
+
+Home Manager owns:
+
+- `~/.zshenv`
+- generated shell configuration under `~/.config/codex-dev-shell`
 - `~/.config/starship.toml`
 - `~/.config/ghostty/config` outside WSL
-- `~/.config/jj/config.toml`
+- `~/.copilot/instructions/playwright.instructions.md`
+- user-level browser, credential, and TypeScript language-server helpers
+- user fonts and platform-specific font discovery
 
 Global Git configuration includes identity, Delta, `zdiff3`, fetch pruning,
 and a default `main` branch. WSL also uses Windows Git Credential Manager.

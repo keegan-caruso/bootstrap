@@ -8,4 +8,5 @@
 - `starship module git_branch`: render one prompt module
 - `starship preset nerd-font-symbols`: print a preset config
 
-In this setup, the prompt is configured through `templates/starship.toml`.
+In this setup, the prompt is configured through
+`nix/templates/starship.toml` and installed by Home Manager.

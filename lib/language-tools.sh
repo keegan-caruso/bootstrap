@@ -73,9 +73,4 @@ install_node_tools() {
     --registry="$ARTIFACTS_NPM_REGISTRY" \
     "${MICROSOFT_NPM_GLOBAL_PACKAGES[@]}"
   npm install -g "${NPM_GLOBAL_PACKAGES[@]}"
-
-  mkdir -p "${HOME}/.local/bin"
-  install -m 0755 \
-    "${SCRIPT_DIR}/templates/typescript-language-server" \
-    "${HOME}/.local/bin/typescript-language-server"
 }

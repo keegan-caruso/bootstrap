@@ -5,5 +5,6 @@
 ## Common Commands
 
 - `fc-list`: list installed fonts
-- `fc-match "JetBrainsMono Nerd Font"`: resolve a font match
+- `fc-match monospace`: resolve the configured Ubuntu Mono default
+- `fc-match "Ubuntu Mono"`: resolve Ubuntu Mono directly
 - `fc-cache -f`: rebuild font cache

@@ -9,6 +9,7 @@ FLAKE_DIR="${SCRIPT_DIR}/nix"
 FLAKE_URL="path:${FLAKE_DIR}"
 STATE_HOME="${XDG_STATE_HOME:-${HOME}/.local/state}"
 PROFILE_PATH="${STATE_HOME}/nix/profiles/bootstrap"
+HOME_MANAGER_USER="keegancaruso"
 NIX_INSTALLER_VERSION="v3.22.2"
 NIX_INSTALLER_SHA256="0e80cca5029d37eab6dd4b53515a5313f4a78b3b4e935c0b7df26e75e5d34365"
 NIX_INSTALLER_URL="https://github.com/DeterminateSystems/nix-installer/releases/download/${NIX_INSTALLER_VERSION}/nix-installer.sh"
@@ -38,28 +39,58 @@ command_exists() {
   command -v "$1" >/dev/null 2>&1
 }
 
-install_wsl_browser() {
-  [[ "$IS_WSL" -eq 1 ]] || return
+legacy_file_has_unmanaged_content() {
+  local file="$1"
+  local name="$2"
+  local start="# >>> ${SCRIPT_MARKER}:${name}"
+  local end="# <<< ${SCRIPT_MARKER}:${name}"
 
-  local local_bin="${HOME}/.local/bin"
-  local browser="${local_bin}/wsl-browser"
-  local xdg_open="${local_bin}/xdg-open"
-
-  mkdir -p "$local_bin"
-  install -m 0755 "${SCRIPT_DIR}/templates/wsl-browser" "$browser"
-  if [[ ! -e "$xdg_open" && ! -L "$xdg_open" ]]; then
-    ln -s "$browser" "$xdg_open"
-  fi
+  awk -v start="$start" -v end="$end" '
+    $0 == start { in_block = 1; next }
+    $0 == end { in_block = 0; next }
+    !in_block && $0 !~ /^[[:space:]]*$/ { found = 1 }
+    END { exit !found }
+  ' "$file"
 }
 
-read_template() {
-  local template_path="$1"
+prepare_home_manager_file() {
+  local file="$1"
+  local legacy_block="$2"
 
-  if [[ ! -f "$template_path" ]]; then
-    fail "Template not found: $template_path"
+  [[ -e "$file" || -L "$file" ]] || return 0
+  [[ -L "$file" ]] && return 0
+
+  if legacy_file_has_unmanaged_content "$file" "$legacy_block"; then
+    fail "Cannot migrate ${file}: it contains content outside the legacy managed block."
   fi
 
-  cat "$template_path"
+  rm -f "$file"
+}
+
+remove_legacy_fontconfig_block() {
+  local file="${HOME}/.config/fontconfig/fonts.conf"
+  local start="<!-- >>> ${SCRIPT_MARKER}:nix-profile-fonts -->"
+  local end="<!-- <<< ${SCRIPT_MARKER}:nix-profile-fonts -->"
+  local tmp
+
+  [[ -f "$file" ]] || return 0
+
+  tmp="$(mktemp)" || fail "Failed to create temporary file"
+  awk -v start="$start" -v end="$end" '
+    $0 == start { in_block = 1; next }
+    $0 == end { in_block = 0; next }
+    !in_block { print }
+  ' "$file" >"$tmp"
+  mv "$tmp" "$file"
+}
+
+prepare_home_manager_migration() {
+  prepare_home_manager_file "${HOME}/.zshenv" "startup"
+  prepare_home_manager_file "${HOME}/.config/starship.toml" "config"
+  remove_legacy_fontconfig_block
+  if [[ "$IS_WSL" -eq 0 ]]; then
+    prepare_home_manager_file "${HOME}/.config/ghostty/config" "config"
+  fi
 }
 
 ensure_file() {
@@ -394,6 +425,42 @@ install_dev_tools() {
   export PATH="${PROFILE_PATH}/bin:${PATH}"
 }
 
+activate_home_manager() {
+  local activation_package
+  local current_system
+  local configuration
+  local platform_variant=""
+
+  current_system="$(nix eval --impure --raw --expr builtins.currentSystem)"
+  if [[ "$IS_WSL" -eq 1 ]]; then
+    platform_variant="-wsl"
+  fi
+  configuration="${HOME_MANAGER_USER}@${current_system}${platform_variant}"
+
+  log "Building Home Manager configuration ${configuration}"
+  activation_package="$(
+    nix build \
+      --no-link \
+      --print-out-paths \
+      "${FLAKE_URL}#homeConfigurations.\"${configuration}\".activationPackage"
+  )"
+  [[ -x "${activation_package}/activate" ]] \
+    || fail "Home Manager activation package is missing its activate command."
+
+  log "Activating Home Manager configuration"
+  "${activation_package}/activate"
+}
+
+install_wsl_browser_link() {
+  [[ "$IS_WSL" -eq 1 ]] || return
+
+  local xdg_open="${HOME}/.local/bin/xdg-open"
+
+  if [[ ! -e "$xdg_open" && ! -L "$xdg_open" ]]; then
+    ln -s "${HOME}/.local/bin/wsl-browser" "$xdg_open"
+  fi
+}
+
 update_dev_tools_profile() (
   local profile_ref="$1"
   local desired_attr="$2"
@@ -490,67 +557,6 @@ remove_legacy_tool_installations() {
   fi
 }
 
-register_nix_profile_fonts() {
-  if [[ "$OS" == "macos" ]]; then
-    local mac_fonts="${HOME}/Library/Fonts/Nix"
-    [[ -d "${PROFILE_PATH}/share/fonts" ]] || return
-    mkdir -p "$mac_fonts"
-    find -L "${PROFILE_PATH}/share/fonts" -type f \
-      \( -name '*.otf' -o -name '*.ttf' \) \
-      -exec cp -f {} "$mac_fonts/" \;
-    return
-  fi
-
-  local fonts_conf_dir="${HOME}/.config/fontconfig"
-  local fonts_conf="${fonts_conf_dir}/fonts.conf"
-  local profile_fonts="${PROFILE_PATH}/share/fonts"
-  local snippet
-  local marker_start="<!-- >>> ${SCRIPT_MARKER}:nix-profile-fonts -->"
-  local marker_end="<!-- <<< ${SCRIPT_MARKER}:nix-profile-fonts -->"
-
-  if [[ ! -d "$profile_fonts" ]]; then
-    log "No fonts directory at ${profile_fonts}; skipping fontconfig registration"
-    return
-  fi
-
-  mkdir -p "$fonts_conf_dir"
-
-  if [[ ! -f "$fonts_conf" ]]; then
-    cat >"$fonts_conf" <<EOF
-<?xml version="1.0"?>
-<!DOCTYPE fontconfig SYSTEM "fonts.dtd">
-<fontconfig>
-${marker_start}
-<dir>${profile_fonts}</dir>
-${marker_end}
-</fontconfig>
-EOF
-  elif ! grep -Fq "$marker_start" "$fonts_conf"; then
-    snippet="${marker_start}\n<dir>${profile_fonts}</dir>\n${marker_end}"
-    if grep -Fq "</fontconfig>" "$fonts_conf"; then
-      # Insert before the closing </fontconfig> tag.
-      awk -v block="$snippet" '
-        /<\/fontconfig>/ && !done {
-          n = split(block, lines, "\n")
-          for (i = 1; i <= n; i++) print lines[i]
-          done = 1
-        }
-        { print }
-      ' "$fonts_conf" >"${fonts_conf}.tmp"
-      mv "${fonts_conf}.tmp" "$fonts_conf"
-    else
-      printf '%s\n<dir>%s</dir>\n%s\n' "$marker_start" "$profile_fonts" "$marker_end" >>"$fonts_conf"
-    fi
-  fi
-
-  if command_exists fc-cache; then
-    log "Refreshing fontconfig cache for ${profile_fonts}"
-    fc-cache -f "$profile_fonts" >/dev/null 2>&1 || true
-  else
-    log "fc-cache not on PATH; new fonts will be picked up on next fontconfig scan"
-  fi
-}
-
 link_nix_apps() {
   [[ "$OS" == "macos" ]] || return
   [[ -d "${PROFILE_PATH}/Applications" ]] || return
@@ -565,16 +571,16 @@ link_nix_apps() {
 
 write_zshrc_blocks() {
   local zshrc="${HOME}/.zshrc"
-  upsert_block "$zshrc" "path" "$(read_template "${SCRIPT_DIR}/templates/zsh/path.sh")"
-  upsert_block "$zshrc" "interactive" "$(read_template "${SCRIPT_DIR}/templates/zsh/interactive.sh")"
-  upsert_block "$zshrc" "prompt" "$(read_template "${SCRIPT_DIR}/templates/zsh/prompt.sh")"
-  upsert_block "$zshrc" "shell-tools" "$(read_template "${SCRIPT_DIR}/templates/zsh/shell-tools.sh")"
-  upsert_block "$zshrc" "syntax-highlighting" "$(read_template "${SCRIPT_DIR}/templates/zsh/syntax-highlighting.sh")"
-}
 
-write_zshenv_block() {
-  upsert_block "${HOME}/.zshenv" "startup" \
-    "$(read_template "${SCRIPT_DIR}/templates/zsh/zshenv.sh")"
+  ensure_file "$zshrc"
+  remove_block "$zshrc" "path"
+  remove_block "$zshrc" "interactive"
+  remove_block "$zshrc" "prompt"
+  remove_block "$zshrc" "shell-tools"
+  remove_block "$zshrc" "syntax-highlighting"
+  # shellcheck disable=SC2016
+  upsert_block "$zshrc" "home-manager" \
+    'source "$HOME/.config/codex-dev-shell/zshrc"'
 }
 
 remove_homebrew_shell_config() {
@@ -584,30 +590,11 @@ remove_homebrew_shell_config() {
 write_bashrc_blocks() {
   [[ "$IS_WSL" -eq 1 ]] || return
 
+  ensure_file "${HOME}/.bashrc"
+  remove_block "${HOME}/.bashrc" "aliases"
+  # shellcheck disable=SC2016
   upsert_block "${HOME}/.bashrc" "aliases" \
-    "$(read_template "${SCRIPT_DIR}/templates/bash/aliases.sh")"
-}
-
-write_starship_config() {
-  local starship_config="${HOME}/.config/starship.toml"
-  upsert_block "$starship_config" "config" "$(read_template "${SCRIPT_DIR}/templates/starship.toml")"
-}
-
-write_ghostty_config() {
-  [[ "$IS_WSL" -eq 0 ]] || return
-
-  local ghostty_config="${HOME}/.config/ghostty/config"
-  upsert_block "$ghostty_config" "config" \
-    "$(read_template "${SCRIPT_DIR}/templates/ghostty/config")"
-}
-
-install_copilot_instructions() {
-  local instructions_dir="${HOME}/.copilot/instructions"
-
-  mkdir -p "$instructions_dir"
-  install -m 0644 \
-    "${SCRIPT_DIR}/templates/copilot/playwright.instructions.md" \
-    "${instructions_dir}/playwright.instructions.md"
+    'source "$HOME/.config/codex-dev-shell/bashrc"'
 }
 
 prompt_for_git_email() {
@@ -629,9 +616,8 @@ configure_gcm_wsl_credential_helper() {
 
   command_exists git.exe \
     || fail "Git for Windows is required for brokered Git authentication."
-
-  mkdir -p "${HOME}/.local/bin"
-  install -m 0755 "${SCRIPT_DIR}/templates/git-credential-manager-wsl" "$helper"
+  [[ -x "$helper" ]] \
+    || fail "Home Manager did not install ${helper}."
 
   git config --global credential.helper manager-wsl
   for host in github.com gist.github.com; do
@@ -648,18 +634,28 @@ configure_gcm_wsl_credential_helper() {
 }
 
 configure_git() {
+  local key
+  local managed_config="${HOME}/.config/git/bootstrap.config"
+
   log "Configuring global Git settings"
   git config --global user.name "$GIT_NAME"
   git config --global user.email "$GIT_EMAIL"
-  git config --global core.pager delta
-  git config --global interactive.diffFilter "delta --color-only"
-  git config --global delta.light true
-  git config --global delta.navigate true
-  git config --global delta.line-numbers true
-  git config --global delta.side-by-side true
-  git config --global merge.conflictStyle zdiff3
-  git config --global fetch.prune true
-  git config --global init.defaultBranch main
+
+  for key in \
+    core.pager \
+    interactive.diffFilter \
+    delta.light \
+    delta.navigate \
+    delta.line-numbers \
+    delta.side-by-side \
+    merge.conflictStyle \
+    fetch.prune \
+    init.defaultBranch
+  do
+    git config --global --unset-all "$key" || true
+  done
+  git config --global --unset-all include.path "$managed_config" || true
+  git config --global --add include.path "$managed_config"
 
   if [[ "$IS_WSL" -eq 1 ]]; then
     git config --global core.fileMode false
@@ -678,7 +674,7 @@ write_jj_config() {
       gsub(/__GIT_EMAIL__/, git_email)
       print
     }
-  ' "${SCRIPT_DIR}/templates/jj/config.toml.tmpl")"
+  ' "${FLAKE_DIR}/templates/jj/config.toml.tmpl")"
 
   upsert_block "$jj_config" "config" "$jj_block"
 }
@@ -700,20 +696,17 @@ main() {
   install_dev_tools
   install_dotnet_tools
   install_node_tools
-  register_nix_profile_fonts
+  prepare_home_manager_migration
+  activate_home_manager
+  install_wsl_browser_link
   link_nix_apps
-  install_wsl_browser
   prompt_for_git_email
   remove_homebrew_shell_config
-  write_zshenv_block
   write_zshrc_blocks
   if [[ "$IS_WSL" -eq 1 ]]; then
     remove_block "${HOME}/.bashrc" "wsl-zsh-handoff"
     write_bashrc_blocks
   fi
-  write_starship_config
-  write_ghostty_config
-  install_copilot_instructions
   configure_git
   write_jj_config
   remove_legacy_profile_entries

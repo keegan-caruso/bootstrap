@@ -69,32 +69,19 @@ EOF
 
   IS_WSL=0
   remove_homebrew_shell_config
-  write_zshenv_block
   write_zshrc_blocks
-  write_starship_config
-  write_ghostty_config
-  install_copilot_instructions
 
   assert_contains "keep-before" "${HOME}/.zprofile"
   assert_contains "keep-after" "${HOME}/.zprofile"
   assert_not_contains "${SCRIPT_MARKER}:homebrew" "${HOME}/.zprofile"
-  assert_marker_once "# >>> ${SCRIPT_MARKER}:startup" "${HOME}/.zshenv"
-  assert_marker_once "# >>> ${SCRIPT_MARKER}:path" "${HOME}/.zshrc"
-  assert_contains 'path=("${(@)path:#/mnt/*/*Microsoft VS Code*/bin}")' "${HOME}/.zshrc"
-  assert_contains "artifacts-npm-credprovider markdownlint-cli2" "${HOME}/.zshrc"
-  assert_marker_once "# >>> ${SCRIPT_MARKER}:config" "${HOME}/.config/starship.toml"
-  assert_marker_once "# >>> ${SCRIPT_MARKER}:config" "${HOME}/.config/ghostty/config"
-  assert_contains "playwright-run pnpm exec playwright test" \
-    "${HOME}/.copilot/instructions/playwright.instructions.md"
+  assert_marker_once "# >>> ${SCRIPT_MARKER}:home-manager" "${HOME}/.zshrc"
+  # shellcheck disable=SC2016
+  assert_contains 'source "$HOME/.config/codex-dev-shell/zshrc"' "${HOME}/.zshrc"
 
   cp -R "$HOME" "$first_run"
 
   remove_homebrew_shell_config
-  write_zshenv_block
   write_zshrc_blocks
-  write_starship_config
-  write_ghostty_config
-  install_copilot_instructions
 
   diff -ru "$first_run" "$HOME" \
     || fail_test "Managed configuration changed on the second run"
@@ -103,6 +90,59 @@ EOF
   write_bashrc_blocks
   write_bashrc_blocks
   assert_marker_once "# >>> ${SCRIPT_MARKER}:aliases" "${HOME}/.bashrc"
+  # shellcheck disable=SC2016
+  assert_contains 'source "$HOME/.config/codex-dev-shell/bashrc"' "${HOME}/.bashrc"
+}
+
+test_home_manager_migration_safety() {
+  local managed_file="${HOME}/.config/starship.toml"
+  local fontconfig_file="${HOME}/.config/fontconfig/fonts.conf"
+
+  mkdir -p "$(dirname "$managed_file")"
+  cat >"$managed_file" <<EOF
+# >>> ${SCRIPT_MARKER}:config
+managed
+# <<< ${SCRIPT_MARKER}:config
+EOF
+  prepare_home_manager_file "$managed_file" "config"
+  [[ ! -e "$managed_file" ]] \
+    || fail_test "Legacy fully managed file was not prepared for Home Manager"
+
+  cat >"$managed_file" <<EOF
+keep
+# >>> ${SCRIPT_MARKER}:config
+managed
+# <<< ${SCRIPT_MARKER}:config
+EOF
+  if (prepare_home_manager_file "$managed_file" "config") >/dev/null 2>&1; then
+    fail_test "Home Manager migration accepted unmanaged user content"
+  fi
+  assert_contains "keep" "$managed_file"
+  rm -f "$managed_file"
+
+  mkdir -p "$(dirname "$fontconfig_file")"
+  cat >"$fontconfig_file" <<EOF
+<fontconfig>
+<!-- >>> ${SCRIPT_MARKER}:nix-profile-fonts -->
+<dir>/old/profile/share/fonts</dir>
+<!-- <<< ${SCRIPT_MARKER}:nix-profile-fonts -->
+<match>keep</match>
+</fontconfig>
+EOF
+  prepare_home_manager_migration
+  assert_not_contains "nix-profile-fonts" "$fontconfig_file"
+  assert_contains "<match>keep</match>" "$fontconfig_file"
+}
+
+test_wsl_browser_link_preserves_custom_opener() {
+  local custom_opener="${HOME}/.local/bin/xdg-open"
+
+  mkdir -p "$(dirname "$custom_opener")"
+  printf 'custom\n' >"$custom_opener"
+
+  IS_WSL=1
+  install_wsl_browser_link
+  assert_contains "custom" "$custom_opener"
 }
 
 test_npm_registry_override() {
@@ -148,8 +188,6 @@ test_npm_registry_override() {
     "npm install -g --allow-scripts=@microsoft/artifacts-credprovider-wrapper --registry=${ARTIFACTS_NPM_REGISTRY} ${MICROSOFT_NPM_GLOBAL_PACKAGES[*]}" \
     "$npm_log"
   assert_contains "npm install -g ${NPM_GLOBAL_PACKAGES[*]}" "$npm_log"
-  [[ -x "${HOME}/.local/bin/typescript-language-server" ]] \
-    || fail_test "TypeScript language server wrapper was not installed"
 }
 
 test_platform_output_selection() {
@@ -183,6 +221,49 @@ test_platform_output_selection() {
   assert_contains \
     "profile ${FLAKE_URL}#workstation packages.x86_64-linux.workstation" \
     "$command_log"
+}
+
+test_home_manager_selection() {
+  local test_activation_package="${TEST_ROOT}/home-manager-generation"
+  local command_log="${TEST_ROOT}/home-manager.log"
+
+  mkdir -p "$test_activation_package"
+  printf '#!/usr/bin/env bash\nprintf "activated\\\\n" >>%q\n' "$command_log" \
+    >"${test_activation_package}/activate"
+  chmod +x "${test_activation_package}/activate"
+
+  nix() {
+    if [[ "${1:-}" == "eval" ]]; then
+      printf 'x86_64-linux'
+      return
+    fi
+
+    printf 'nix %s\n' "$*" >>"$command_log"
+    printf '%s\n' "$test_activation_package"
+  }
+
+  IS_WSL=1
+  activate_home_manager
+  assert_contains \
+    "homeConfigurations.\"keegancaruso@x86_64-linux-wsl\".activationPackage" \
+    "$command_log"
+  assert_contains "activated" "$command_log"
+}
+
+test_git_managed_include() {
+  local managed_config="${HOME}/.config/git/bootstrap.config"
+
+  mkdir -p "$(dirname "$managed_config")"
+  printf '[core]\n  pager = delta\n' >"$managed_config"
+
+  GIT_EMAIL="keegan@example.test"
+  IS_WSL=0
+  configure_git
+
+  assert_equals "Keegan Caruso" "$(git config --global user.name)"
+  assert_equals "$GIT_EMAIL" "$(git config --global user.email)"
+  assert_equals "$managed_config" "$(git config --global --get include.path)"
+  assert_equals "delta" "$(git config --global --includes core.pager)"
 }
 
 test_platform_output_autodetection() (
@@ -250,9 +331,13 @@ test_legacy_tool_cleanup() {
 }
 
 test_managed_config_is_idempotent
+test_home_manager_migration_safety
+test_wsl_browser_link_preserves_custom_opener
 test_npm_registry_override
 test_platform_output_selection
+test_home_manager_selection
 test_platform_output_autodetection
+test_git_managed_include
 test_legacy_tool_cleanup
 
 printf 'Bootstrap integration checks passed\n'

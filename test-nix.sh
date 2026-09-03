@@ -46,6 +46,15 @@ nix flake check --all-systems --no-build "path:${FLAKE_DIR}"
 printf 'Building the current system tool environment\n'
 nix build --no-link "path:${FLAKE_DIR}#$(nix_tool_output)"
 
+current_system="$(nix eval --impure --raw --expr builtins.currentSystem)"
+home_variant=""
+if is_wsl; then
+  home_variant="-wsl"
+fi
+printf 'Building the current Home Manager configuration\n'
+nix build --no-link \
+  "path:${FLAKE_DIR}#homeConfigurations.\"keegancaruso@${current_system}${home_variant}\".activationPackage"
+
 if [[ "$(uname -s)" == "Linux" ]]; then
   printf 'Testing the Playwright browser environment\n'
   nix develop "path:${FLAKE_DIR}" --command playwright-run bash -c '

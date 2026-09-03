@@ -1,5 +1,6 @@
 command = /bin/zsh
-font-family = JetBrainsMono Nerd Font
+font-family = Ubuntu Mono
+font-family = Symbols Nerd Font Mono
 theme = GitHub Light Default
 background = #ffffff
 foreground = #1f2328

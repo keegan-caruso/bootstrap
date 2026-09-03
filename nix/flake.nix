@@ -1,10 +1,19 @@
 {
   description = "Personal Nix development environment.";
 
+  inputs.home-manager = {
+    url = "github:nix-community/home-manager";
+    inputs.nixpkgs.follows = "nixpkgs";
+  };
+
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
 
   outputs =
-    { nixpkgs, ... }:
+    {
+      home-manager,
+      nixpkgs,
+      ...
+    }:
     let
       systems = [
         "x86_64-linux"
@@ -155,6 +164,7 @@
               zsh-autosuggestions
               zsh-syntax-highlighting
               dotnetSdk
+              home-manager.packages.${system}.default
             ]
             ++ lib.optionals pkgs.stdenv.hostPlatform.isLinux [
               bubblewrap
@@ -169,9 +179,9 @@
             wslview
           ];
           fonts = with pkgs; [
-            nerd-fonts.jetbrains-mono
             nerd-fonts.symbols-only
             symbola
+            ubuntu-classic
           ];
           desktopTools = with pkgs; [
             ghostty
@@ -199,8 +209,40 @@
             paths = cliTools ++ fonts ++ desktopTools;
           };
         };
+      mkHomeConfiguration =
+        {
+          system,
+          isWsl ? false,
+        }:
+        let
+          p = mkPackages system;
+        in
+        home-manager.lib.homeManagerConfiguration {
+          pkgs = p.pkgs;
+          extraSpecialArgs = {
+            inherit isWsl;
+            fontPackages = p.fonts;
+          };
+          modules = [ ./home.nix ];
+        };
     in
     {
+      homeConfigurations = {
+        "keegancaruso@x86_64-linux-wsl" = mkHomeConfiguration {
+          system = "x86_64-linux";
+          isWsl = true;
+        };
+        "keegancaruso@x86_64-linux" = mkHomeConfiguration {
+          system = "x86_64-linux";
+        };
+        "keegancaruso@aarch64-linux" = mkHomeConfiguration {
+          system = "aarch64-linux";
+        };
+        "keegancaruso@aarch64-darwin" = mkHomeConfiguration {
+          system = "aarch64-darwin";
+        };
+      };
+
       packages = forAllSystems (
         system:
         let

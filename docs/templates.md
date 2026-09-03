@@ -1,37 +1,44 @@
 # Templates
 
-Bootstrap reads tracked templates from `templates/` and writes managed
-blocks into user config files.
+Home Manager reads tracked templates from `nix/templates/` and installs the
+generated user configuration. The bootstrap retains small loader blocks in
+existing shell files and renders the identity-dependent Jujutsu configuration.
 
 ## Template Files
 
-- `templates/zsh/path.sh`
-- `templates/zsh/interactive.sh`
-- `templates/zsh/prompt.sh`
-- `templates/zsh/shell-tools.sh`
-- `templates/zsh/syntax-highlighting.sh`
-- `templates/bash/aliases.sh`
-- `templates/starship.toml`
-- `templates/typescript-language-server`
-- `templates/ghostty/config`
-- `templates/jj/config.toml.tmpl`
+- `nix/templates/zsh/path.sh`
+- `nix/templates/zsh/interactive.sh`
+- `nix/templates/zsh/prompt.sh`
+- `nix/templates/zsh/shell-tools.sh`
+- `nix/templates/zsh/syntax-highlighting.sh`
+- `nix/templates/bash/aliases.sh`
+- `nix/templates/starship.toml`
+- `nix/templates/typescript-language-server`
+- `nix/templates/ghostty/config`
+- `nix/templates/jj/config.toml.tmpl`
+- `nix/templates/copilot/playwright.instructions.md`
+- `nix/templates/git-credential-manager-wsl`
+- `nix/templates/wsl-browser`
 
 ## What They Feed
 
-- `templates/zsh/path.sh` -> managed path block in `~/.zshrc`
-- `templates/zsh/interactive.sh` -> managed interactive block in `~/.zshrc`
-- `templates/zsh/prompt.sh` -> managed prompt block in `~/.zshrc`
-- `templates/zsh/shell-tools.sh` -> managed shell helper block in `~/.zshrc`
-- `templates/zsh/syntax-highlighting.sh` -> managed syntax-highlighting block in `~/.zshrc`
-- `templates/bash/aliases.sh` -> managed alias block in `~/.bashrc`
-- `templates/starship.toml` -> managed block in `~/.config/starship.toml`
-- `templates/typescript-language-server` -> `~/.local/bin/typescript-language-server`
-- `templates/ghostty/config` -> managed block in `~/.config/ghostty/config`
-- `templates/jj/config.toml.tmpl` -> rendered into `~/.config/jj/config.toml`
+- Zsh templates -> `~/.config/codex-dev-shell/zshrc`, sourced by the managed
+  loader block in `~/.zshrc`
+- `nix/templates/bash/aliases.sh` -> `~/.config/codex-dev-shell/bashrc`,
+  sourced by the managed WSL loader block in `~/.bashrc`
+- `nix/templates/starship.toml` -> `~/.config/starship.toml`
+- `nix/templates/typescript-language-server` ->
+  `~/.local/bin/typescript-language-server`
+- `nix/templates/ghostty/config` -> `~/.config/ghostty/config`
+- `nix/templates/copilot/playwright.instructions.md` ->
+  `~/.copilot/instructions/playwright.instructions.md`
+- WSL helper templates -> executables under `~/.local/bin`
+- `nix/templates/jj/config.toml.tmpl` -> rendered into
+  `~/.config/jj/config.toml` by the bootstrap
 
 ## JJ Template Rendering
 
-`templates/jj/config.toml.tmpl` is rendered with:
+`nix/templates/jj/config.toml.tmpl` is rendered with:
 
 - `__GIT_NAME__`
 - `__GIT_EMAIL__`
