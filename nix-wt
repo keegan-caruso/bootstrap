@@ -296,6 +296,8 @@ print "[${script_name}] Starting: ${(q)command_args}"
     --user \
     --scope \
     --collect \
+    --expand-environment=no \
+    --property=CPUQuota=800% \
     --unit="$scope_name" \
     -- \
     "${command_args[@]}"

@@ -52,7 +52,13 @@ test_git_overlay_uses_immutable_lower() {
 
   create_git_repository "$repository"
   NIX_WT_IN_NIX=1 "${REPO_DIR}/nix-wt" git-test -C "$repository" -- \
-    bash -lc 'printf "overlay\n" > overlay.txt'
+    bash -euo pipefail -c '
+      cgroup="$(awk -F: '"'"'$1 == "0" { print $3 }'"'"' /proc/self/cgroup)"
+      read -r quota period <"/sys/fs/cgroup${cgroup}/cpu.max"
+      test "$quota" != max
+      test "$((quota * 100 / period))" -eq 800
+      printf "overlay\n" > overlay.txt
+    '
   advance_repository "$repository"
   NIX_WT_IN_NIX=1 "${REPO_DIR}/nix-wt" git-test -C "$repository" -- \
     bash -lc 'test -f overlay.txt && test ! -e new-main.txt'
