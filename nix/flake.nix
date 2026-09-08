@@ -106,10 +106,13 @@
             pkgs.dotnetCorePackages.sdk_8_0
             pkgs.dotnetCorePackages.sdk_10_0
           ];
+          azureCli = pkgs.azure-cli.withExtensions [
+            pkgs.azure-cli-extensions.azure-devops
+          ];
           cliTools =
             with pkgs;
             [
-              azure-cli
+              azureCli
               bat
               bottom
               cmark
