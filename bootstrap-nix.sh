@@ -10,6 +10,8 @@ FLAKE_URL="path:${FLAKE_DIR}"
 STATE_HOME="${XDG_STATE_HOME:-${HOME}/.local/state}"
 PROFILE_PATH="${STATE_HOME}/nix/profiles/bootstrap"
 HOME_MANAGER_USER="keegancaruso"
+SUBUID_FILE="${SUBUID_FILE:-/etc/subuid}"
+SUBGID_FILE="${SUBGID_FILE:-/etc/subgid}"
 NIX_INSTALLER_VERSION="v3.22.2"
 NIX_INSTALLER_SHA256="0e80cca5029d37eab6dd4b53515a5313f4a78b3b4e935c0b7df26e75e5d34365"
 NIX_INSTALLER_URL="https://github.com/DeterminateSystems/nix-installer/releases/download/${NIX_INSTALLER_VERSION}/nix-installer.sh"
@@ -177,6 +179,85 @@ EOF
   fi
 }
 
+find_subordinate_id_start() {
+  local file="$1"
+  local candidate=100000
+  local count=65536
+
+  while sudo awk -F: \
+    -v start="$candidate" \
+    -v end="$((candidate + count - 1))" '
+      NF >= 3 {
+        range_start = $2
+        range_end = $2 + $3 - 1
+        if (start <= range_end && end >= range_start) {
+          found = 1
+          exit
+        }
+      }
+      END { exit found ? 0 : 1 }
+    ' "$file"
+  do
+    candidate=$((candidate + count))
+  done
+
+  printf '%s\n' "$candidate"
+}
+
+ensure_subordinate_id_range() {
+  local file="$1"
+  local usermod_option="$2"
+  local label="$3"
+  local user="$4"
+  local start
+
+  if sudo awk -F: -v user="$user" '
+    $1 == user && $3 >= 65536 { found = 1 }
+    END { exit found ? 0 : 1 }
+  ' "$file"; then
+    log "Rootless container ${label} range already configured for ${user}"
+    return
+  fi
+
+  start="$(find_subordinate_id_start "$file")"
+  log "Allocating rootless container ${label} range for ${user}"
+  sudo usermod "$usermod_option" "${start}-$((start + 65535))" "$user"
+}
+
+ensure_rootless_container_prereqs() {
+  [[ "$OS" == "ubuntu" ]] || return
+
+  local user
+  local sysctl_conf="/etc/sysctl.d/99-${SCRIPT_MARKER}-containers.conf"
+  local sysctl_settings=""
+
+  user="$(id -un)"
+  ensure_subordinate_id_range "$SUBUID_FILE" --add-subuids "UID" "$user"
+  ensure_subordinate_id_range "$SUBGID_FILE" --add-subgids "GID" "$user"
+
+  [[ -u /usr/bin/newuidmap ]] \
+    || fail "/usr/bin/newuidmap must be setuid root for rootless containers."
+  [[ -u /usr/bin/newgidmap ]] \
+    || fail "/usr/bin/newgidmap must be setuid root for rootless containers."
+
+  if [[ -e /proc/sys/kernel/unprivileged_userns_clone ]] \
+    && [[ "$(< /proc/sys/kernel/unprivileged_userns_clone)" != "1" ]]; then
+    sysctl_settings+="kernel.unprivileged_userns_clone = 1"$'\n'
+  fi
+  if [[ -e /proc/sys/user/max_user_namespaces ]] \
+    && (( $(< /proc/sys/user/max_user_namespaces) == 0 )); then
+    sysctl_settings+="user.max_user_namespaces = 28633"$'\n'
+  fi
+
+  if [[ -n "$sysctl_settings" ]]; then
+    log "Enabling unprivileged user namespaces for rootless containers"
+    printf '# Managed by %s. Rootless container user namespaces.\n%s' \
+      "$SCRIPT_MARKER" "$sysctl_settings" \
+      | sudo tee "$sysctl_conf" >/dev/null
+    sudo sysctl --quiet --load="$sysctl_conf"
+  fi
+}
+
 install_apt_prereqs() {
   [[ "$OS" == "ubuntu" ]] || return
 
@@ -188,6 +269,7 @@ install_apt_prereqs() {
     gnome-keyring \
     libsecret-1-0 \
     libsecret-tools \
+    uidmap \
     xz-utils
 }
 
@@ -494,6 +576,7 @@ main() {
   fi
 
   install_apt_prereqs
+  ensure_rootless_container_prereqs
   install_nix
   source_nix
   install_dev_tools

@@ -43,6 +43,7 @@ EOF
 COPILOT_SETTINGS_FILE="$SETTINGS_FILE" \
 COPILOT_PACKAGE_CACHE_PATH="${TEST_ROOT}/copilot-pkg" \
 PLAYWRIGHT_BROWSER_CACHE_PATH="${TEST_ROOT}/ms-playwright" \
+CONTAINER_STORAGE_PATH="${TEST_ROOT}/containers" \
   "${REPO_DIR}/configure-copilot-sandbox.sh" >/dev/null
 
 jq -e '
@@ -59,13 +60,14 @@ jq -e '
     == (["/already-readonly", "/nix/store", $package_cache,
          env.NIX_PROFILES_PATH, env.FNM_DIR, env.COPILOT_LOCAL_BIN_PATH] | sort)
   and .sandbox.userPolicy.filesystem.readwritePaths
-    == ["/already-readwrite", $browser_cache]
+    == (["/already-readwrite", $browser_cache, $container_storage] | sort)
   and .sandbox.userPolicy.filesystem.clearPolicyOnExit == false
   and .sandbox.userPolicy.network.allowOutbound == true
   and .sandbox.userPolicy.network.allowLocalNetwork == true
 ' \
   --arg package_cache "${TEST_ROOT}/copilot-pkg" \
   --arg browser_cache "${TEST_ROOT}/ms-playwright" \
+  --arg container_storage "${TEST_ROOT}/containers" \
   "$SETTINGS_FILE" >/dev/null \
   || fail_test "Sandbox settings were not merged correctly."
 
@@ -76,6 +78,7 @@ cp "$SETTINGS_FILE" "${TEST_ROOT}/first-run.json"
 COPILOT_SETTINGS_FILE="$SETTINGS_FILE" \
 COPILOT_PACKAGE_CACHE_PATH="${TEST_ROOT}/copilot-pkg" \
 PLAYWRIGHT_BROWSER_CACHE_PATH="${TEST_ROOT}/ms-playwright" \
+CONTAINER_STORAGE_PATH="${TEST_ROOT}/containers" \
   "${REPO_DIR}/configure-copilot-sandbox.sh" >/dev/null
 cmp -s "${TEST_ROOT}/first-run.json" "$SETTINGS_FILE" \
   || fail_test "Sandbox configuration is not idempotent."
@@ -83,6 +86,7 @@ cmp -s "${TEST_ROOT}/first-run.json" "$SETTINGS_FILE" \
 COPILOT_SETTINGS_FILE="$SETTINGS_FILE" \
 COPILOT_PACKAGE_CACHE_PATH="${TEST_ROOT}/copilot-pkg" \
 PLAYWRIGHT_BROWSER_CACHE_PATH="${TEST_ROOT}/ms-playwright" \
+CONTAINER_STORAGE_PATH="${TEST_ROOT}/containers" \
   "${REPO_DIR}/configure-copilot-sandbox.sh" --configure-only >/dev/null
 cmp -s "${TEST_ROOT}/first-run.json" "$SETTINGS_FILE" \
   || fail_test "Configure-only changed an enabled sandbox."

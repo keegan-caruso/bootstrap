@@ -38,14 +38,22 @@ Nix provisions `csharp-ls`, and Home Manager writes its absolute executable path
 to `~/.copilot/lsp-config.json`. Restart Copilot or use `/lsp reload` after
 activation to load the server.
 
-Linux profiles include `bubblewrap`, `slirp4netns`, and `iptables` for Copilot's
-filesystem and firewall-network sandbox. `configure-copilot-sandbox.sh` refuses
-to enable the sandbox if any required executable is missing, leaving existing
-settings intact.
+Linux profiles include rootless Podman and Buildah, plus `bubblewrap`,
+`slirp4netns`, `fuse-overlayfs`, and `iptables`. The container command wrappers
+prefer Ubuntu's `/usr/bin/newuidmap` and `/usr/bin/newgidmap`; Nix store
+executables cannot carry the setuid bit required to create subordinate-ID
+mappings. The bootstrap installs those host helpers and configures subordinate
+UID/GID ranges and unprivileged user namespaces. The Buildah wrapper also pins
+its rootless graph and runtime storage to the same user-owned locations Podman
+uses, avoiding rootful `/run/containers/storage` defaults.
+
+`configure-copilot-sandbox.sh` refuses to enable the sandbox if any required
+executable is missing, leaving existing settings intact.
 
 The sandbox exposes the Nix profile directory, fnm runtimes, and
 `~/.local/bin` read-only. Mounting `/nix/store` alone does not make the profile
-symlinks on `PATH` visible.
+symlinks on `PATH` visible. The Playwright browser cache and rootless container
+storage under `~/.local/share/containers` are writable.
 
 To update these paths without enabling a disabled sandbox:
 
@@ -74,6 +82,9 @@ instructions, fonts, and user-level helper executables. Small managed loader
 blocks remain in `.zshrc` and WSL `.bashrc` so unrelated user content is
 preserved. Home Manager configures fontconfig on Linux and installs native
 font copies under `~/Library/Fonts/HomeManager` on macOS.
+Package installation remains owned by the dedicated bootstrap profile rather
+than Home Manager's standalone `~/.nix-profile`, and the generated Home Manager
+option manual is disabled.
 During the first migration, bootstrap refuses to replace a legacy `.zshenv`,
 Starship, or Ghostty file that contains content outside its managed block.
 Existing custom WSL `~/.local/bin/xdg-open` implementations are also preserved.

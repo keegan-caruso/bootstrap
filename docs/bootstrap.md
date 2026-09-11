@@ -77,7 +77,10 @@ The pinned nixpkgs revision no longer supports Intel macOS.
 Ubuntu uses apt only for host integration prerequisites such as CA
 certificates, the Nix installer, and Secret Service support. Development tools
 come from the pinned Nix flake, including Bubblewrap for Copilot CLI command
-sandboxing.
+sandboxing and rootless Podman and Buildah. The bootstrap installs Ubuntu's
+setuid `newuidmap` and `newgidmap` helpers, allocates subordinate UID/GID ranges
+when needed, and enables unprivileged user namespaces when the host has them
+disabled.
 
 When Nix is absent, the bootstrap downloads the pinned Determinate Nix
 installer release and verifies its published SHA-256 digest before running it.

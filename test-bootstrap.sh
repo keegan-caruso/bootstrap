@@ -402,6 +402,36 @@ test_platform_output_selection() {
     "$command_log"
 }
 
+test_rootless_container_subordinate_ids() (
+  local command_log="${TEST_ROOT}/rootless-containers.log"
+  local test_subuid="${TEST_ROOT}/subuid"
+  local test_subgid="${TEST_ROOT}/subgid"
+
+  printf 'existing:100000:65536\n' >"$test_subuid"
+  printf 'keegancaruso:100000:65536\n' >"$test_subgid"
+
+  sudo() {
+    if [[ "$1" == "usermod" ]]; then
+      printf 'usermod %s\n' "$*" >>"$command_log"
+      return
+    fi
+    command "$@"
+  }
+
+  assert_equals "165536" "$(find_subordinate_id_start "$test_subuid")"
+  ensure_subordinate_id_range \
+    "$test_subuid" --add-subuids "UID" keegancaruso
+  assert_contains \
+    "usermod usermod --add-subuids 165536-231071 keegancaruso" \
+    "$command_log"
+
+  : >"$command_log"
+  ensure_subordinate_id_range \
+    "$test_subgid" --add-subgids "GID" keegancaruso
+  [[ ! -s "$command_log" ]] \
+    || fail_test "Existing subordinate GID range was modified"
+)
+
 test_home_manager_selection() {
   local test_activation_package="${TEST_ROOT}/home-manager-generation"
   local test_home_files="${TEST_ROOT}/home-manager-files"
@@ -611,6 +641,7 @@ test_home_manager_migration_safety
 test_wsl_browser_link_preserves_custom_opener
 test_npm_registry_override
 test_platform_output_selection
+test_rootless_container_subordinate_ids
 test_home_manager_selection
 test_home_manager_activation_rollback
 test_home_manager_activation_signal_rollback

@@ -64,6 +64,16 @@ home_manager_generation="$(
     "path:${FLAKE_DIR}#homeConfigurations.\"keegancaruso@${current_system}${home_variant}\".activationPackage"
 )"
 home_files="$(readlink "${home_manager_generation}/home-files")"
+if grep -Fq "nix profile install" "${home_manager_generation}/activate"; then
+  printf 'Home Manager activation still uses deprecated nix profile install\n' >&2
+  exit 1
+fi
+[[ "$(nix eval --json \
+  "path:${FLAKE_DIR}#homeConfigurations.\"keegancaruso@${current_system}${home_variant}\".config.manual.manpages.enable")" == "false" ]] \
+  || {
+    printf 'Home Manager manual generation must remain disabled\n' >&2
+    exit 1
+  }
 if is_wsl; then
   [[ -e "${home_files}/.local/bin/git-credential-manager-wsl" ]] || {
     printf 'WSL Home Manager configuration is missing its credential helper\n' >&2
@@ -107,9 +117,13 @@ if [[ "$(uname -s)" == "Linux" ]]; then
   printf 'Testing Linux sandbox runtime dependencies\n'
   nix develop "path:${FLAKE_DIR}" --command bash -euc '
     bwrap --version
+    buildah --version
     slirp4netns --version
     iptables --version
     ip6tables --version
+    podman --version
+    podman unshare true
+    buildah info >/dev/null
   '
 
   printf 'Testing declared runtime paths with the rest of HOME hidden\n'

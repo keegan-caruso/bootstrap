@@ -9,6 +9,7 @@ NIX_PROFILES_PATH="${NIX_PROFILES_PATH:-${XDG_STATE_HOME:-${HOME}/.local/state}/
 FNM_PATH="${FNM_DIR:-${XDG_DATA_HOME:-${HOME}/.local/share}/fnm}"
 LOCAL_BIN_PATH="${COPILOT_LOCAL_BIN_PATH:-${HOME}/.local/bin}"
 READWRITE_PATH="${PLAYWRIGHT_BROWSER_CACHE_PATH:-${HOME}/.cache/ms-playwright}"
+CONTAINER_STORAGE_PATH="${CONTAINER_STORAGE_PATH:-${XDG_DATA_HOME:-${HOME}/.local/share}/containers}"
 ENABLE_SANDBOX=true
 LOCK_DIR="${SETTINGS_FILE}.lock.d"
 TMP_FILE=""
@@ -79,7 +80,8 @@ jq_filter='
         + [$readonly_path, $nix_store_path, $nix_profiles_path, $fnm_path,
            $local_bin_path]) | unique)
   | .sandbox.userPolicy.filesystem.readwritePaths =
-      (((.sandbox.userPolicy.filesystem.readwritePaths // []) + [$readwrite_path]) | unique)
+      (((.sandbox.userPolicy.filesystem.readwritePaths // [])
+        + [$readwrite_path, $container_storage_path]) | unique)
   | .sandbox.userPolicy.filesystem.clearPolicyOnExit = false
   | .sandbox.userPolicy.network.allowOutbound = true
   | .sandbox.userPolicy.network.allowLocalNetwork = true
@@ -94,6 +96,7 @@ jq_args=(
   --arg fnm_path "$FNM_PATH"
   --arg local_bin_path "$LOCAL_BIN_PATH"
   --arg readwrite_path "$READWRITE_PATH"
+  --arg container_storage_path "$CONTAINER_STORAGE_PATH"
 )
 
 if [[ -f "$SETTINGS_FILE" ]]; then
@@ -116,6 +119,7 @@ log "Read-only path: ${NIX_PROFILES_PATH}"
 log "Read-only path: ${FNM_PATH}"
 log "Read-only path: ${LOCAL_BIN_PATH}"
 log "Read-write path: ${READWRITE_PATH}"
+log "Read-write path: ${CONTAINER_STORAGE_PATH}"
 if [[ "$ENABLE_SANDBOX" == false ]]; then
   log "Sandbox enablement was left unchanged."
 fi

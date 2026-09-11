@@ -78,6 +78,30 @@
                 -c 'exec "$@"' playwright-run "$@"
             '';
           };
+          rootlessContainerTool =
+            name: package:
+            pkgs.writeShellApplication {
+              inherit name;
+              text = ''
+                export PATH="/usr/bin:/bin:$PATH"
+                exec ${lib.getExe package} "$@"
+              '';
+            };
+          buildahRun = pkgs.writeShellApplication {
+            name = "buildah";
+            text = ''
+              export PATH="/usr/bin:/bin:$PATH"
+              case "''${1:-}" in
+                -h|--help|-v|--version)
+                  exec ${lib.getExe pkgs.buildah} "$@"
+                  ;;
+              esac
+              exec ${lib.getExe pkgs.buildah} \
+                --root "''${XDG_DATA_HOME:-$HOME/.local/share}/containers/storage" \
+                --runroot "''${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/containers" \
+                "$@"
+            '';
+          };
           wslview = pkgs.writeShellApplication {
             name = "wslview";
             text = ''
@@ -161,9 +185,11 @@
             ]
             ++ lib.optionals pkgs.stdenv.hostPlatform.isLinux [
               bubblewrap
+              buildahRun
               fuse-overlayfs
               iptables
               playwrightRun
+              (rootlessContainerTool "podman" podman)
               powershell
               slirp4netns
               util-linux

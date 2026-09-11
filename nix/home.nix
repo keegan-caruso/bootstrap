@@ -19,6 +19,8 @@ let
   runtimeEnvironment = dotnetEnvironment + builtins.readFile (template "node-path.sh");
 in
 {
+  submoduleSupport.externalPackageInstall = true;
+
   home = {
     username = "keegancaruso";
     inherit homeDirectory;
@@ -92,6 +94,8 @@ in
       };
     };
   };
+
+  manual.manpages.enable = false;
 
   fonts.fontconfig = {
     enable = pkgs.stdenv.hostPlatform.isLinux;
