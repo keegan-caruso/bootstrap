@@ -18,6 +18,9 @@ source "${SCRIPT_DIR}/lib/nix-profile.sh"
 # shellcheck source=lib/home-manager.sh
 # shellcheck disable=SC1091
 source "${SCRIPT_DIR}/lib/home-manager.sh"
+# shellcheck source=lib/shell-config.sh
+# shellcheck disable=SC1091
+source "${SCRIPT_DIR}/lib/shell-config.sh"
 
 log() {
   printf '[update-nix] %s\n' "$*"
@@ -108,6 +111,7 @@ main() {
   )
 
   activate_home_manager
+  reconcile_shell_loaders
 
   log "Update complete. Review and commit nix/flake.lock."
 }

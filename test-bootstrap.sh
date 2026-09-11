@@ -511,6 +511,101 @@ test_legacy_tool_cleanup() {
     || fail_test "Non-legacy CSharpier shim was removed during opted-in cleanup"
 }
 
+test_update_reconciles_shell_loaders() (
+  # shellcheck disable=SC1091
+  source "${REPO_DIR}/update-nix.sh"
+  mkdir -p "$PROFILE_PATH" "${HOME}/.config/codex-dev-shell"
+  printf 'export DOTNET_ROOT=/updated-runtime\n' >"${HOME}/.config/codex-dev-shell/bashrc"
+  printf 'export DOTNET_ROOT=/updated-runtime\n' >"${HOME}/.config/codex-dev-shell/zshrc"
+  printf '# user content\n# >>> codex-dev-shell:aliases\nexport DOTNET_ROOT=/old-runtime\n# <<< codex-dev-shell:aliases\n' >"${HOME}/.bashrc"
+  printf '# user content\n# >>> codex-dev-shell:path\nexport DOTNET_ROOT=/old-runtime\n# <<< codex-dev-shell:path\n' >"${HOME}/.zshrc"
+
+  activate_nix() { :; }
+  activate_home_manager() { :; }
+  is_wsl() { return 0; }
+  nix() {
+    case "$*" in
+      "eval --impure --raw --expr builtins.currentSystem")
+        printf 'x86_64-linux'
+        ;;
+      "profile list --profile "*)
+        printf 'Flake attribute: packages.x86_64-linux.default\nOriginal flake URL: %s\n' "$FLAKE_URL"
+        ;;
+      *) return 0 ;;
+    esac
+  }
+
+  main
+  main
+  assert_contains '# user content' "${HOME}/.bashrc"
+  assert_contains '# user content' "${HOME}/.zshrc"
+  assert_not_contains /old-runtime "${HOME}/.bashrc"
+  assert_not_contains /old-runtime "${HOME}/.zshrc"
+  assert_marker_once "# >>> ${SCRIPT_MARKER}:aliases" "${HOME}/.bashrc"
+  assert_marker_once "# >>> ${SCRIPT_MARKER}:home-manager" "${HOME}/.zshrc"
+  assert_equals /updated-runtime "$(env -u DOTNET_ROOT bash --noprofile --rcfile "${HOME}/.bashrc" -ic 'printf "%s" "$DOTNET_ROOT"' 2>/dev/null)"
+  assert_equals /updated-runtime "$(env -u DOTNET_ROOT zsh -ic 'printf "%s" "$DOTNET_ROOT"')"
+)
+
+test_node_path_fallback() (
+  local original_path="$PATH"
+  local default_bin="${TEST_ROOT}/custom-fnm/aliases/default/bin"
+  local selected_bin="${TEST_ROOT}/selected-node/bin"
+  mkdir -p "$default_bin" "$selected_bin"
+  printf '#!/bin/sh\nexit 0\n' >"$default_bin/node"
+  cp "$default_bin/node" "$selected_bin/node"
+  chmod +x "$default_bin/node" "$selected_bin/node"
+
+  export FNM_DIR="${TEST_ROOT}/custom-fnm"
+  # shellcheck disable=SC2123
+  PATH="${TEST_ROOT}/empty"
+  # shellcheck disable=SC1091
+  source "${REPO_DIR}/nix/templates/node-path.sh"
+  assert_equals "$default_bin/node" "$(command -v node)"
+  source "${REPO_DIR}/nix/templates/node-path.sh"
+  assert_equals "${TEST_ROOT}/empty:${default_bin}" "$PATH"
+
+  PATH="$selected_bin"
+  source "${REPO_DIR}/nix/templates/node-path.sh"
+  assert_equals "$selected_bin/node" "$(command -v node)"
+
+  unset FNM_DIR
+  export XDG_DATA_HOME="${TEST_ROOT}/custom-data"
+  PATH="$original_path"
+  source "${REPO_DIR}/nix/templates/node-path.sh"
+  assert_equals "${XDG_DATA_HOME}/fnm" "$FNM_DIR"
+)
+
+test_zsh_cache_tracks_store_identity() (
+  local fixture="${TEST_ROOT}/cache-fixture"
+  mkdir -p "$fixture/v1" "$fixture/v2" "$fixture/v3"
+  printf 'export CACHE_VERSION=old\n' >"$fixture/v1/plugin.zsh"
+  printf 'export CACHE_VERSION=new\n' >"$fixture/v2/plugin.zsh"
+  printf 'export CACHE_VERSION=newest\n' >"$fixture/v3/plugin.zsh"
+  printf 'old metadata\n' >"$fixture/v1/.version"
+  printf 'new metadata\n' >"$fixture/v2/.version"
+  touch -t 197001010000 "$fixture/v1/plugin.zsh" "$fixture/v2/plugin.zsh" \
+    "$fixture/v3/plugin.zsh" "$fixture/v1/.version" "$fixture/v2/.version"
+  ln -s "$fixture/v1" "$fixture/profile"
+
+  ZSH_NONINTERACTIVE_SAFE=1 zsh -f -e -c '
+    source "$1/nix/templates/zsh/interactive.sh"
+    _zsh_startup_cache_dir="$2/cache"
+    _zsh_cache_source "$2/profile/plugin.zsh" plugin
+    test "$CACHE_VERSION" = old
+    test -s "$2/cache/plugin/plugin.zsh.zwc"
+    ln -sfn "$2/v2" "$2/profile"
+    _zsh_cache_source "$2/profile/plugin.zsh" plugin
+    test "$CACHE_VERSION" = new
+    test "$(<"$2/cache/plugin/.version")" = "new metadata"
+    test "$(<"$2/cache/plugin/plugin.zsh.source")" = "$2/v2/plugin.zsh"
+    ln -sfn "$2/v3" "$2/profile"
+    _zsh_cache_source "$2/profile/plugin.zsh" plugin
+    test "$CACHE_VERSION" = newest
+    test ! -e "$2/cache/plugin/.version"
+  ' cache-regression "$REPO_DIR" "$fixture"
+)
+
 test_managed_config_is_idempotent
 test_home_manager_migration_safety
 test_wsl_browser_link_preserves_custom_opener
@@ -523,5 +618,8 @@ test_malformed_shell_block_safety
 test_platform_output_autodetection
 test_git_managed_include
 test_legacy_tool_cleanup
+test_update_reconciles_shell_loaders
+test_node_path_fallback
+test_zsh_cache_tracks_store_identity
 
 printf 'Bootstrap integration checks passed\n'

@@ -118,6 +118,7 @@
               cmark
               cmake
               coreutils
+              csharp-ls
               csharpier
               delta
               doggo
@@ -161,8 +162,10 @@
             ++ lib.optionals pkgs.stdenv.hostPlatform.isLinux [
               bubblewrap
               fuse-overlayfs
+              iptables
               playwrightRun
               powershell
+              slirp4netns
               util-linux
               wl-clipboard
             ];
@@ -182,6 +185,7 @@
           inherit
             cliTools
             desktopTools
+            dotnetSdk
             fonts
             pkgs
             playwrightRun
@@ -212,6 +216,7 @@
           pkgs = p.pkgs;
           extraSpecialArgs = {
             inherit isWsl;
+            dotnetRoot = "${p.dotnetSdk}/share/dotnet";
             fontPackages = p.fonts;
           };
           modules = [ ./home.nix ];
@@ -254,6 +259,11 @@
         {
           default = p.pkgs.mkShell {
             packages = p.cliTools ++ p.fonts;
+            DOTNET_ROOT = "${p.dotnetSdk}/share/dotnet";
+            shellHook = ''
+              export PATH="$PATH:$HOME/.local/bin"
+              ${builtins.readFile ./templates/node-path.sh}
+            '';
           };
         }
       );

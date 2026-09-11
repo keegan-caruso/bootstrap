@@ -18,35 +18,56 @@ _zsh_cache_source() {
   local cache_dir="${_zsh_startup_cache_dir}/${cache_name}"
   local cache_file="${cache_dir}/${source_file:t}"
   local temp_file="${cache_file}.$$"
+  local identity_file="${cache_file}.source"
+  local source_identity="${source_file:A}"
+  local cached_identity=""
+  local refreshed=0
   local companion
 
   [[ -r "$source_file" ]] || return 1
 
-  if [[ ! -s "$cache_file" || "$source_file" -nt "$cache_file" ]]; then
+  if [[ -r "$identity_file" ]]; then
+    cached_identity="$(<"$identity_file")"
+  fi
+  if [[ ! -s "$cache_file" || "$source_identity" != "$cached_identity" ||
+        "$source_file" -nt "$cache_file" ]]; then
     if ! command mkdir -p "$cache_dir"; then
       print -u2 "zsh: failed to create startup cache directory"
       source "$source_file"
       return
     fi
     if ! command cp "$source_file" "$temp_file" ||
-       ! command mv -f "$temp_file" "$cache_file"; then
+       ! command mv -f "$temp_file" "$cache_file" ||
+       ! command rm -f "${cache_file}.zwc"; then
       print -u2 "zsh: failed to cache startup file: $source_file"
       command rm -f "$temp_file"
       source "$source_file"
       return
     fi
+    refreshed=1
   fi
 
   for companion in .version .revision-hash; do
     if [[ -r "${source_file:h}/$companion" &&
-          ( ! -s "$cache_dir/$companion" ||
+          ( $refreshed -eq 1 || ! -s "$cache_dir/$companion" ||
             "${source_file:h}/$companion" -nt "$cache_dir/$companion" ) ]]; then
       if ! command cp "${source_file:h}/$companion" "$cache_dir/$companion"; then
         print -u2 "zsh: failed to cache plugin metadata: ${source_file:h}/$companion"
+        return 1
       fi
+    elif (( refreshed )) && [[ ! -r "${source_file:h}/$companion" ]]; then
+      command rm -f "$cache_dir/$companion" || return 1
     fi
   done
 
+  if (( refreshed )); then
+    if ! print -r -- "$source_identity" >| "${identity_file}.$$" ||
+       ! command mv -f "${identity_file}.$$" "$identity_file"; then
+      print -u2 "zsh: failed to record startup cache source: $source_file"
+      command rm -f "${identity_file}.$$"
+      return 1
+    fi
+  fi
   _zsh_compile_file "$cache_file"
   source "$cache_file"
 }

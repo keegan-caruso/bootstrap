@@ -1,4 +1,5 @@
 {
+  dotnetRoot,
   fontPackages,
   isWsl,
   lib,
@@ -11,6 +12,11 @@ let
     paths: lib.concatMapStringsSep "\n\n" (path: builtins.readFile (template path)) paths;
   homeDirectory =
     if pkgs.stdenv.hostPlatform.isDarwin then "/Users/keegancaruso" else "/home/keegancaruso";
+  dotnetEnvironment = ''
+    export DOTNET_ROOT=${lib.escapeShellArg dotnetRoot}
+    export DOTNET_CLI_TELEMETRY_OPTOUT=true
+  '';
+  runtimeEnvironment = dotnetEnvironment + builtins.readFile (template "node-path.sh");
 in
 {
   home = {
@@ -21,7 +27,7 @@ in
 
     file = {
       ".zshenv" = {
-        source = template "zsh/zshenv.sh";
+        text = runtimeEnvironment + builtins.readFile (template "zsh/zshenv.sh");
       };
       ".config/codex-dev-shell/zshrc".text = joinTemplates [
         "zsh/path.sh"
@@ -30,7 +36,8 @@ in
         "zsh/shell-tools.sh"
         "zsh/syntax-highlighting.sh"
       ];
-      ".config/codex-dev-shell/bashrc".source = template "bash/aliases.sh";
+      ".config/codex-dev-shell/bashrc".text =
+        runtimeEnvironment + builtins.readFile (template "bash/aliases.sh");
       ".config/starship.toml" = {
         source = template "starship.toml";
       };
@@ -53,6 +60,16 @@ in
       '';
       ".copilot/instructions/playwright.instructions.md" = {
         source = template "copilot/playwright.instructions.md";
+      };
+      ".copilot/lsp-config.json".text = builtins.toJSON {
+        lspServers.csharp = {
+          command = "${pkgs.csharp-ls}/bin/csharp-ls";
+          args = [ ];
+          fileExtensions = {
+            ".cs" = "csharp";
+            ".csx" = "csharp";
+          };
+        };
       };
       ".local/bin/typescript-language-server" = {
         source = template "typescript-language-server";

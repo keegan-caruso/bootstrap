@@ -21,6 +21,38 @@ Linux and macOS for bootstrap, update, and local build checks.
 The flake exposes the official `nixfmt` from the pinned nixpkgs revision as its
 formatter.
 
+The development shell and Home Manager shell startup files export `DOTNET_ROOT`
+from the same combined .NET SDK package. Native .NET apphosts (including test
+executables launched by `dotnet test`) need this to locate `libhostfxr` in the
+Nix store; putting `dotnet` on `PATH` alone is insufficient. This also applies
+to `nix-wt` and `sr-wt` child processes.
+
+The shell environment also exposes fnm's stable default runtime at
+`$FNM_DIR/aliases/default/bin` (defaulting to `${XDG_DATA_HOME:-~/.local/share}/fnm`).
+This makes Node tools available to noninteractive Nix shells without inheriting
+a temporary fnm multishell path. An explicitly selected runtime remains ahead
+of this fallback. Node and global npm tools are still installed by bootstrap,
+not by Nix.
+
+Nix provisions `csharp-ls`, and Home Manager writes its absolute executable path
+to `~/.copilot/lsp-config.json`. Restart Copilot or use `/lsp reload` after
+activation to load the server.
+
+Linux profiles include `bubblewrap`, `slirp4netns`, and `iptables` for Copilot's
+filesystem and firewall-network sandbox. `configure-copilot-sandbox.sh` refuses
+to enable the sandbox if any required executable is missing, leaving existing
+settings intact.
+
+The sandbox exposes the Nix profile directory, fnm runtimes, and
+`~/.local/bin` read-only. Mounting `/nix/store` alone does not make the profile
+symlinks on `PATH` visible.
+
+To update these paths without enabling a disabled sandbox:
+
+```bash
+./configure-copilot-sandbox.sh --configure-only
+```
+
 ## Install
 
 ```bash
@@ -53,6 +85,10 @@ Existing custom WSL `~/.local/bin/xdg-open` implementations are also preserved.
 ```
 
 After a successful update, review and commit `nix/flake.lock`.
+Updates also reconcile the managed shell loader blocks, so legacy inline
+configuration cannot mask the newly activated Home Manager files. Shell plugin
+caches track resolved source paths to refresh across Nix store generations,
+whose source timestamps are normalized.
 
 ## Roll back
 
