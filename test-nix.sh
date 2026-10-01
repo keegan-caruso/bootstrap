@@ -106,6 +106,9 @@ env -u FNM_MULTISHELL_PATH -u FNM_DIR \
     pnpm --version
     tsc --version
     test -x "$(command -v typescript-language-server)"
+    test "$(readlink -f "$(command -v python)")" = "$(readlink -f "$(command -v python3)")"
+    python --version
+    python3 --version
     csharp-ls --version
   '
 

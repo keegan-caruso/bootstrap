@@ -34,6 +34,9 @@ a temporary fnm multishell path. An explicitly selected runtime remains ahead
 of this fallback. Node and global npm tools are still installed by bootstrap,
 not by Nix.
 
+The CLI environment includes nixpkgs' latest Python 3 runtime. The package
+provides both `python` and `python3` as aliases for the same interpreter.
+
 Nix provisions `csharp-ls`, and Home Manager writes its absolute executable path
 to `~/.copilot/lsp-config.json`. Restart Copilot or use `/lsp reload` after
 activation to load the server.

@@ -161,6 +161,7 @@
               ncdu
               pandoc
               procs
+              python3
               ripgrep
               ruff
               rust-analyzer
