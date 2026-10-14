@@ -37,9 +37,9 @@ not by Nix.
 The CLI environment includes nixpkgs' latest Python 3 runtime. The package
 provides both `python` and `python3` as aliases for the same interpreter.
 
-Nix provisions `csharp-ls`, and Home Manager writes its absolute executable path
-to `~/.copilot/lsp-config.json`. Restart Copilot or use `/lsp reload` after
-activation to load the server.
+The environment provides .NET SDKs and CSharpier, but does not install a C#
+language server or manage `~/.copilot/lsp-config.json`. Language-server setup
+remains user-managed.
 
 Linux profiles include rootless Podman and Buildah, plus `bubblewrap`,
 `slirp4netns`, `fuse-overlayfs`, and `iptables`. The container command wrappers
@@ -58,6 +58,14 @@ The sandbox exposes the Nix profile directory, fnm runtimes, and
 symlinks on `PATH` visible. The Playwright browser cache and rootless container
 storage under `~/.local/share/containers` are writable.
 
+On Linux, run repository-owned Playwright through `playwright-run`. Its FHS
+environment supplies browser libraries and the .NET runtime dependencies
+`zlib`, ICU, and OpenSSL for native accessibility checkers such as
+`A11yAgent.Automation.Orchestrator`. Add native runtime
+dependencies to the flake's `playwrightFhs.targetPkgs`, not to a hard-coded
+`LD_LIBRARY_PATH`. The Playwright smoke check verifies library discovery
+without an inherited `LD_LIBRARY_PATH`.
+
 To update these paths without enabling a disabled sandbox:
 
 ```bash
@@ -71,7 +79,7 @@ To update these paths without enabling a disabled sandbox:
 ```
 
 The bootstrap installs Nix with the pinned Determinate Systems installer
-`v3.22.2` when needed. It downloads the immutable release script and verifies
+`v3.23.2` when needed. It downloads the immutable release script and verifies
 its published SHA-256 digest before execution, then installs the appropriate
 flake output into a dedicated profile at
 `${XDG_STATE_HOME:-~/.local/state}/nix/profiles/bootstrap`.

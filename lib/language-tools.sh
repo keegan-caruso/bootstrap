@@ -35,12 +35,9 @@ install_node_tools() {
 
   eval "$(fnm env --use-on-cd --shell bash)"
 
+  log "Installing the latest Node.js LTS with fnm"
+  fnm install --lts --use
   node_version="$(fnm current 2>/dev/null || true)"
-  if [[ ! "$node_version" =~ ^v[0-9]+([.][0-9]+){2}$ ]]; then
-    log "Installing Node.js LTS with fnm"
-    fnm install --lts --use
-    node_version="$(fnm current 2>/dev/null || true)"
-  fi
 
   if [[ ! "$node_version" =~ ^v[0-9]+([.][0-9]+){2}$ ]]; then
     fail "fnm did not provide a managed Node.js runtime."

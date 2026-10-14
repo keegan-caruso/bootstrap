@@ -48,8 +48,8 @@ tool_environment="$(
   nix build --no-link --print-out-paths \
     "path:${FLAKE_DIR}#$(nix_tool_output)"
 )"
-[[ ! -e "${tool_environment}/bin/git-credential-manager-wsl" ]] || {
-  printf 'WSL credential helper must be owned only by Home Manager\n' >&2
+[[ ! -e "${tool_environment}/bin/csharp-ls" && ! -L "${tool_environment}/bin/csharp-ls" ]] || {
+  printf 'The bootstrap profile must not provision a C# language server\n' >&2
   exit 1
 }
 
@@ -64,6 +64,10 @@ home_manager_generation="$(
     "path:${FLAKE_DIR}#homeConfigurations.\"keegancaruso@${current_system}${home_variant}\".activationPackage"
 )"
 home_files="$(readlink "${home_manager_generation}/home-files")"
+[[ ! -e "${home_files}/.copilot/lsp-config.json" && ! -L "${home_files}/.copilot/lsp-config.json" ]] || {
+  printf 'Home Manager must not manage the Copilot language-server configuration\n' >&2
+  exit 1
+}
 if grep -Fq "nix profile install" "${home_manager_generation}/activate"; then
   printf 'Home Manager activation still uses deprecated nix profile install\n' >&2
   exit 1
@@ -74,12 +78,6 @@ fi
     printf 'Home Manager manual generation must remain disabled\n' >&2
     exit 1
   }
-if is_wsl; then
-  [[ -e "${home_files}/.local/bin/git-credential-manager-wsl" ]] || {
-    printf 'WSL Home Manager configuration is missing its credential helper\n' >&2
-    exit 1
-  }
-fi
 
 printf 'Testing .NET runtime discovery in development and generated home shells\n'
 env -u DOTNET_ROOT nix develop "path:${FLAKE_DIR}" --command bash -euc '
@@ -109,12 +107,8 @@ env -u FNM_MULTISHELL_PATH -u FNM_DIR \
     test "$(readlink -f "$(command -v python)")" = "$(readlink -f "$(command -v python3)")"
     python --version
     python3 --version
-    csharp-ls --version
+    terraform version
   '
-
-printf 'Testing the generated C# language-server configuration\n'
-lsp_command="$(jq -er '.lspServers.csharp.command' "${home_files}/.copilot/lsp-config.json")"
-"$lsp_command" --version
 
 if [[ "$(uname -s)" == "Linux" ]]; then
   printf 'Testing Linux sandbox runtime dependencies\n'
@@ -161,16 +155,19 @@ if [[ "$(uname -s)" == "Linux" ]]; then
         test "$(command -v jq)" = "$1/bin/jq"
         jq --version
         dotnet --list-sdks
-        csharp-ls --version
         node --version
       ' runtime-visibility "$profile_path"
   )
 
-  printf 'Testing the Playwright browser environment\n'
-  nix develop "path:${FLAKE_DIR}" --command playwright-run bash -c '
+  printf 'Testing the Playwright browser and native checker environment\n'
+  env -u LD_LIBRARY_PATH nix develop "path:${FLAKE_DIR}" --command playwright-run bash -euc '
     test "$PLAYWRIGHT_BROWSERS_PATH" = "$HOME/.cache/ms-playwright"
     ldconfig -p | grep -q "libgbm.so.1"
     ldconfig -p | grep -q "libnss3.so"
+    ldconfig -p | grep -q "libz.so.1"
+    ldconfig -p | grep -q "libicuuc.so"
+    ldconfig -p | grep -q "libssl.so.3"
+    ldconfig -p | grep -q "libcrypto.so.3"
   '
 fi
 

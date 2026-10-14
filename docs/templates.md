@@ -17,7 +17,6 @@ existing shell files and renders the identity-dependent Jujutsu configuration.
 - `nix/templates/ghostty/config`
 - `nix/templates/jj/config.toml.tmpl`
 - `nix/templates/copilot/playwright.instructions.md`
-- `nix/templates/git-credential-manager-wsl`
 - `nix/templates/wsl-browser`
 
 ## What They Feed

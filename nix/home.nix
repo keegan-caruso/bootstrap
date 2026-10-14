@@ -63,16 +63,6 @@ in
       ".copilot/instructions/playwright.instructions.md" = {
         source = template "copilot/playwright.instructions.md";
       };
-      ".copilot/lsp-config.json".text = builtins.toJSON {
-        lspServers.csharp = {
-          command = "${pkgs.csharp-ls}/bin/csharp-ls";
-          args = [ ];
-          fileExtensions = {
-            ".cs" = "csharp";
-            ".csx" = "csharp";
-          };
-        };
-      };
       ".local/bin/typescript-language-server" = {
         source = template "typescript-language-server";
         executable = true;
@@ -84,10 +74,6 @@ in
       };
     }
     // lib.optionalAttrs isWsl {
-      ".local/bin/git-credential-manager-wsl" = {
-        source = template "git-credential-manager-wsl";
-        executable = true;
-      };
       ".local/bin/wsl-browser" = {
         source = template "wsl-browser";
         executable = true;

@@ -77,7 +77,7 @@ remove_block() {
   local lock_dir="${file}.lock.d"
   local tmp
 
-  [[ -f "$file" ]] || return
+  [[ -f "$file" ]] || return 0
   legacy_markers_are_well_formed "$file" "$start" "$end" \
     || fail "Cannot update ${file}: its ${name} managed block is malformed."
   tmp="$(mktemp)" || fail "Failed to create temporary file"

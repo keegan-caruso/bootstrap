@@ -45,6 +45,7 @@
                 freetype
                 glib
                 gtk3
+                icu
                 libdrm
                 libgbm
                 libx11
@@ -58,8 +59,10 @@
                 mesa
                 nspr
                 nss
+                openssl
                 pango
                 systemd
+                zlib
               ];
             runScript = "bash";
             privateTmp = false;
@@ -132,6 +135,7 @@
           ];
           azureCli = pkgs.azure-cli.withExtensions [
             pkgs.azure-cli-extensions.azure-devops
+            pkgs.azure-cli-extensions.log-analytics
           ];
           cliTools =
             with pkgs;
@@ -142,7 +146,6 @@
               cmark
               cmake
               coreutils
-              csharp-ls
               csharpier
               delta
               doggo
@@ -170,6 +173,7 @@
               shfmt
               starship
               taplo
+              terraform
               tokei
               ty
               uv
