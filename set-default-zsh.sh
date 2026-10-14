@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+SHELLS_FILE="${SHELLS_FILE:-/etc/shells}"
+
 log() {
   printf '[set-default-zsh] %s\n' "$*"
 }
@@ -16,17 +18,18 @@ detect_os() {
       OS="macos"
       ;;
     Linux)
-      if [[ -f /etc/os-release ]]; then
-        # shellcheck disable=SC1091
-        source /etc/os-release
-        if [[ "${ID:-}" == "ubuntu" ]]; then
-          OS="ubuntu"
-        else
-          fail "Unsupported Linux distribution: ${ID:-unknown}. This script supports Ubuntu only."
-        fi
-      else
-        fail "Unable to detect Linux distribution."
-      fi
+      local os_release="${OS_RELEASE_FILE:-/etc/os-release}"
+      [[ -f "$os_release" ]] || fail "Unable to detect Linux distribution."
+      # shellcheck disable=SC1090
+      source "$os_release"
+      case "${ID:-}" in
+        ubuntu|fedora)
+          OS="$ID"
+          ;;
+        *)
+          fail "Unsupported Linux distribution: ${ID:-unknown}. This script supports Ubuntu and Fedora."
+          ;;
+      esac
       ;;
     *)
       fail "Unsupported operating system: $(uname -s)"
@@ -37,16 +40,16 @@ detect_os() {
 set_default_zsh() {
   local zsh_path
 
-  zsh_path="$(command -v zsh)"
-  if [[ -z "$zsh_path" ]]; then
-    fail "zsh was not found. Install zsh first."
-  fi
+  zsh_path="$(command -v zsh)" \
+    || fail "zsh was not found. Install zsh first."
 
-  if [[ "$OS" == "ubuntu" ]]; then
-    if ! grep -Fxq "$zsh_path" /etc/shells; then
-      printf '%s\n' "$zsh_path" | sudo tee -a /etc/shells >/dev/null
+  if [[ "$OS" == "ubuntu" || "$OS" == "fedora" ]]; then
+    if ! grep -Fxq "$zsh_path" "$SHELLS_FILE"; then
+      printf '%s\n' "$zsh_path" | sudo tee -a "$SHELLS_FILE" >/dev/null
     fi
     if [[ "${SHELL:-}" != "$zsh_path" ]]; then
+      command -v chsh >/dev/null 2>&1 \
+        || fail "chsh is required to change the default shell."
       log "Setting zsh as the default shell for ${USER}"
       chsh -s "$zsh_path"
     else
@@ -61,4 +64,6 @@ main() {
   log "Done"
 }
 
-main "$@"
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+  main "$@"
+fi

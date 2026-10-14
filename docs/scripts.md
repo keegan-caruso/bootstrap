@@ -6,7 +6,7 @@ Main machine bootstrap. It handles:
 
 - OS detection
 - Nix installation and pinned profile provisioning
-- Ubuntu 24.04/26.04 host integration
+- Ubuntu 24.04/26.04 and Fedora 45 host integration
 - CLI, .NET, Python, Rust, fonts, and Ghostty through Nix
 - Node.js installation through `fnm`
 - npm-native tools using the configured npm registry
@@ -22,6 +22,15 @@ Run:
 
 `bootstrap-dev-shell.sh` and `bootstrap-wsl-nix.sh` delegate to this command
 for compatibility.
+
+## `set-default-zsh.sh`
+
+Registers the installed Zsh in `/etc/shells` and selects it as the user's
+default shell on Ubuntu or Fedora.
+
+```bash
+./set-default-zsh.sh
+```
 
 ## `configure-copilot-sandbox.sh`
 
@@ -85,11 +94,26 @@ Run:
 
 After it succeeds, review and commit the `nix/flake.lock` change.
 
+## `test-linux-host.sh`
+
+Runs host-integration checks inside the official Fedora 45 container image. It
+verifies platform detection and rejection rules, installs the declared dnf
+prerequisites, confirms Fedora does not run Ubuntu's rootless-container setup,
+and exercises default-Zsh configuration.
+
+Run:
+
+```bash
+./test-linux-host.sh
+```
+
+Set `FEDORA_IMAGE` to test an alternate Fedora 45 image reference.
+
 ## `test-nix.sh`
 
 Runs the isolated-home bootstrap checks, verifies `nixfmt` formatting, evaluates
-the flake for every supported system, and builds the current machine's tool
-environment locally.
+the flake for every supported system, builds the current machine's tool
+environment locally, and runs the Fedora 45 host-container checks.
 
 Run:
 

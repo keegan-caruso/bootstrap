@@ -326,6 +326,8 @@ test_wsl_browser_link_preserves_custom_opener() {
 
 test_npm_registry_override() {
   local npm_log="${TEST_ROOT}/npm.log"
+  local fnm_log="${TEST_ROOT}/fnm.log"
+  local current_node_version="v24.19.0"
 
   fnm() {
     case "${1:-}" in
@@ -333,9 +335,16 @@ test_npm_registry_override() {
         return
         ;;
       current)
-        printf 'v22.18.0\n'
+        printf '%s\n' "$current_node_version"
+        ;;
+      install)
+        [[ "$*" == "install --lts --use" ]] \
+          || fail_test "Unexpected fnm install command: $*"
+        printf 'fnm %s\n' "$*" >>"$fnm_log"
+        current_node_version="v24.21.0"
         ;;
       default|use)
+        printf 'fnm %s\n' "$*" >>"$fnm_log"
         return
         ;;
       *)
@@ -361,6 +370,10 @@ test_npm_registry_override() {
   unset NPM_CONFIG_REGISTRY
   BOOTSTRAP_NPM_REGISTRY="https://registry.example.test/" install_node_tools
 
+  assert_contains "fnm install --lts --use" "$fnm_log"
+  assert_contains "fnm default v24.21.0" "$fnm_log"
+  assert_contains "fnm use v24.21.0" "$fnm_log"
+  assert_equals "v24.21.0" "$current_node_version"
   assert_contains "registry=https://registry.example.test/" "$npm_log"
   assert_contains "npm uninstall -g typescript-language-server" "$npm_log"
   assert_contains \
@@ -476,6 +489,88 @@ test_git_managed_include() {
   assert_equals "$managed_config" "$(git config --global --get include.path)"
   assert_equals "delta" "$(git config --global --includes core.pager)"
 }
+
+test_wsl_git_uses_windows_gcm() (
+  local managed_config="${HOME}/.config/git/bootstrap.config"
+  local gcm_available=0
+  local expected_helper='/mnt/c/Program\ Files/Git/mingw64/bin/git-credential-manager.exe'
+  mkdir -p "$(dirname "$managed_config")"
+  printf '[core]\n  pager = delta\n' >"$managed_config"
+
+  command_exists() {
+    [[ "$1" == "/mnt/c/Program Files/Git/mingw64/bin/git-credential-manager.exe" \
+      && "$gcm_available" == 1 ]]
+  }
+
+  git config --global --add credential.helper manager-wsl
+  git config --global --add credential.helper store
+  git config --global --add credential.helper cache
+  git config --global credential.https://github.com.helper '!gh auth git-credential'
+  git config --global credential.https://dev.azure.com.helper manager-wsl
+  git config --global --add credential.https://dev.azure.com.helper custom-ado
+  GIT_EMAIL="keegan@example.test"
+  IS_WSL=1
+  if (configure_git) >"${TEST_ROOT}/missing-gcm.log" 2>&1; then
+    fail_test "WSL Git configuration accepted a missing Windows GCM executable"
+  fi
+  assert_contains "Windows Git Credential Manager is required" "${TEST_ROOT}/missing-gcm.log"
+  assert_contains manager-wsl "${HOME}/.gitconfig"
+
+  gcm_available=1
+  configure_git
+  configure_git
+
+  assert_equals "$expected_helper" "$(git config --global --get-all credential.helper)"
+  assert_equals true "$(git config --global credential.https://dev.azure.com.useHttpPath)"
+  assert_equals '!gh auth git-credential' \
+    "$(git config --global credential.https://github.com.helper)"
+  assert_equals "custom-ado" \
+    "$(git config --global --get-all credential.https://dev.azure.com.helper)"
+)
+
+test_azureauth_install() (
+  local command_log="${TEST_ROOT}/azureauth.log"
+  local mock_checksum="3943ffeba55b380c087d8f92a3221caf8b1c02c198558d472613248169639b45"
+  local binary="${HOME}/.local/share/azureauth/${AZUREAUTH_VERSION}/azureauth"
+  IS_WSL=1
+
+  dpkg-query() {
+    return 1
+  }
+  curl() {
+    local output
+    for output in "$@"; do :; done
+    printf 'curl %s\n' "$*" >>"$command_log"
+    printf 'package' >"$output"
+  }
+  sha256sum() {
+    printf '%s  %s\n' "$mock_checksum" "$1"
+  }
+  dpkg-deb() {
+    printf 'dpkg-deb %s\n' "$*" >>"$command_log"
+    mkdir -p "$3/usr/lib/azureauth"
+    printf '#!/usr/bin/env bash\n' >"$3/usr/lib/azureauth/azureauth"
+    chmod +x "$3/usr/lib/azureauth/azureauth"
+  }
+
+  mock_checksum="invalid"
+  if (install_azureauth); then
+    fail_test "AzureAuth accepted an invalid checksum"
+  fi
+  [[ ! -e "$binary" ]] || fail_test "Invalid AzureAuth package was installed"
+  assert_not_contains "dpkg-deb -x" "$command_log"
+
+  mock_checksum="3943ffeba55b380c087d8f92a3221caf8b1c02c198558d472613248169639b45"
+  : >"$command_log"
+  install_azureauth
+  assert_contains "azureauth-0.9.6-linux-x64.deb" "$command_log"
+  assert_contains "dpkg-deb -x" "$command_log"
+  assert_equals "$binary" "$(readlink "${HOME}/.local/bin/azureauth")"
+
+  : >"$command_log"
+  install_azureauth
+  [[ ! -s "$command_log" ]] || fail_test "AzureAuth was reinstalled unnecessarily"
+)
 
 test_platform_output_autodetection() (
   local system_name="Linux"
@@ -648,9 +743,13 @@ test_home_manager_activation_signal_rollback
 test_malformed_shell_block_safety
 test_platform_output_autodetection
 test_git_managed_include
+test_wsl_git_uses_windows_gcm
+test_azureauth_install
 test_legacy_tool_cleanup
 test_update_reconciles_shell_loaders
 test_node_path_fallback
 test_zsh_cache_tracks_store_identity
+
+bash "${REPO_DIR}/test-linux-host.sh"
 
 printf 'Bootstrap integration checks passed\n'

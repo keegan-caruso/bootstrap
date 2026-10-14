@@ -12,9 +12,10 @@ PROFILE_PATH="${STATE_HOME}/nix/profiles/bootstrap"
 HOME_MANAGER_USER="keegancaruso"
 SUBUID_FILE="${SUBUID_FILE:-/etc/subuid}"
 SUBGID_FILE="${SUBGID_FILE:-/etc/subgid}"
-NIX_INSTALLER_VERSION="v3.22.2"
-NIX_INSTALLER_SHA256="0e80cca5029d37eab6dd4b53515a5313f4a78b3b4e935c0b7df26e75e5d34365"
+NIX_INSTALLER_VERSION="v3.23.2"
+NIX_INSTALLER_SHA256="7dad70f7ea368a3cad732ea40ae4e67909394c87ee4d218ab29368f4796d2486"
 NIX_INSTALLER_URL="https://github.com/DeterminateSystems/nix-installer/releases/download/${NIX_INSTALLER_VERSION}/nix-installer.sh"
+AZUREAUTH_VERSION="0.9.6"
 # shellcheck source=packages.sh
 # shellcheck disable=SC1091
 source "${SCRIPT_DIR}/packages.sh"
@@ -55,20 +56,33 @@ detect_os() {
       OS="macos"
       ;;
     Linux)
-      [[ -f /etc/os-release ]] || fail "Unable to detect Linux distribution."
-      # shellcheck disable=SC1091
-      . /etc/os-release
-      [[ "${ID:-}" == "ubuntu" ]] \
-        || fail "Unsupported Linux distribution: ${ID:-unknown}. This script supports Ubuntu only."
-      case "${VERSION_ID:-}" in
-        24.04|26.04)
+      local os_release="${OS_RELEASE_FILE:-/etc/os-release}"
+      [[ -f "$os_release" ]] || fail "Unable to detect Linux distribution."
+      # shellcheck disable=SC1090
+      . "$os_release"
+      case "${ID:-}" in
+        ubuntu)
+          case "${VERSION_ID:-}" in
+            24.04|26.04) ;;
+            *)
+              fail "Unsupported Ubuntu version: ${VERSION_ID:-unknown}. This script supports Ubuntu 24.04 and 26.04."
+              ;;
+          esac
+          OS="ubuntu"
+          ;;
+        fedora)
+          [[ "${VERSION_ID:-}" == "45" ]] \
+            || fail "Unsupported Fedora version: ${VERSION_ID:-unknown}. This script supports Fedora 45."
+          [[ ! -e /run/ostree-booted ]] \
+            || fail "Fedora Atomic desktops are not supported by this bootstrap."
+          OS="fedora"
           ;;
         *)
-          fail "Unsupported Ubuntu version: ${VERSION_ID:-unknown}. This script supports Ubuntu 24.04 and 26.04."
+          fail "Unsupported Linux distribution: ${ID:-unknown}. This script supports Ubuntu and Fedora."
           ;;
       esac
-      OS="ubuntu"
       if is_wsl; then
+        [[ "$OS" == "ubuntu" ]] || fail "WSL bootstrap supports Ubuntu only."
         IS_WSL=1
       fi
       ;;
@@ -79,8 +93,8 @@ detect_os() {
 }
 
 require_sudo() {
-  [[ "$OS" == "ubuntu" ]] || return
-  command_exists sudo || fail "sudo is required on Ubuntu."
+  [[ "$OS" == "ubuntu" || "$OS" == "fedora" ]] || return 0
+  command_exists sudo || fail "sudo is required on Linux."
   sudo -v
 }
 
@@ -225,7 +239,7 @@ ensure_subordinate_id_range() {
 }
 
 ensure_rootless_container_prereqs() {
-  [[ "$OS" == "ubuntu" ]] || return
+  [[ "$OS" == "ubuntu" ]] || return 0
 
   local user
   local sysctl_conf="/etc/sysctl.d/99-${SCRIPT_MARKER}-containers.conf"
@@ -258,19 +272,90 @@ ensure_rootless_container_prereqs() {
   fi
 }
 
-install_apt_prereqs() {
-  [[ "$OS" == "ubuntu" ]] || return
+install_host_prereqs() {
+  case "$OS" in
+    ubuntu)
+      log "Installing Ubuntu integration prerequisites"
+      sudo apt-get update
+      sudo apt-get install -y \
+        ca-certificates \
+        curl \
+        gnome-keyring \
+        libsecret-1-0 \
+        libsecret-tools \
+        uidmap \
+        xz-utils
+      ;;
+    fedora)
+      log "Installing Fedora integration prerequisites"
+      sudo dnf install -y \
+        ca-certificates \
+        /usr/bin/curl \
+        gnome-keyring \
+        libsecret \
+        policycoreutils \
+        util-linux \
+        xz
+      ;;
+  esac
+}
 
-  log "Installing Ubuntu integration prerequisites"
-  sudo apt-get update
-  sudo apt-get install -y \
-    ca-certificates \
-    curl \
-    gnome-keyring \
-    libsecret-1-0 \
-    libsecret-tools \
-    uidmap \
-    xz-utils
+install_azureauth() {
+  [[ "$IS_WSL" -eq 1 ]] || return 0
+
+  local arch checksum package actual_checksum staging
+  local install_root="${HOME}/.local/share/azureauth/${AZUREAUTH_VERSION}"
+  local binary="${install_root}/azureauth"
+  local link="${HOME}/.local/bin/azureauth"
+  if [[ "$(dpkg-query -W -f='${Version}' azureauth 2>/dev/null)" == "${AZUREAUTH_VERSION}-1" ]]; then
+    return
+  fi
+  if [[ -L "$link" && "$(readlink "$link")" == "$binary" && -x "$binary" ]]; then
+    return
+  fi
+  [[ ! -e "$link" && ! -L "$link" ]] \
+    || fail "Cannot replace an existing AzureAuth executable at ${link}."
+  [[ ! -e "$install_root" ]] \
+    || fail "AzureAuth installation at ${install_root} is incomplete."
+
+  case "$(uname -m)" in
+    x86_64)
+      arch="x64"
+      checksum="3943ffeba55b380c087d8f92a3221caf8b1c02c198558d472613248169639b45"
+      ;;
+    aarch64)
+      arch="arm64"
+      checksum="e19df4a0bb59bbe4deb7a4e45aed50ff229b78d5248501fc73d9b626335338e8"
+      ;;
+    *)
+      fail "Unsupported AzureAuth architecture: $(uname -m)"
+      ;;
+  esac
+
+  package="$(mktemp --suffix=.deb)" || fail "Failed to create AzureAuth package file"
+  if ! curl --proto '=https' --tlsv1.2 -fsSL \
+    "https://github.com/AzureAD/microsoft-authentication-cli/releases/download/${AZUREAUTH_VERSION}/azureauth-${AZUREAUTH_VERSION}-linux-${arch}.deb" \
+    -o "$package"; then
+    rm -f "$package"
+    fail "Failed to download AzureAuth ${AZUREAUTH_VERSION}"
+  fi
+  actual_checksum="$(sha256sum "$package" | awk '{ print $1 }')"
+  if [[ "$actual_checksum" != "$checksum" ]]; then
+    rm -f "$package"
+    fail "AzureAuth package checksum verification failed"
+  fi
+  mkdir -p "${HOME}/.local/share/azureauth" "${HOME}/.local/bin"
+  staging="$(mktemp -d "${HOME}/.local/share/azureauth/.${AZUREAUTH_VERSION}.XXXXXX")" \
+    || fail "Failed to create AzureAuth installation directory"
+  if ! dpkg-deb -x "$package" "$staging"; then
+    rm -rf "$staging"
+    rm -f "$package"
+    fail "Failed to extract AzureAuth ${AZUREAUTH_VERSION}"
+  fi
+  rm -f "$package"
+  mv "${staging}/usr/lib/azureauth" "$install_root"
+  rm -rf "$staging"
+  ln -s "$binary" "$link"
 }
 
 install_nix() {
@@ -360,7 +445,7 @@ install_dev_tools() {
 }
 
 install_wsl_browser_link() {
-  [[ "$IS_WSL" -eq 1 ]] || return
+  [[ "$IS_WSL" -eq 1 ]] || return 0
 
   local xdg_open="${HOME}/.local/bin/xdg-open"
 
@@ -466,8 +551,8 @@ remove_legacy_tool_installations() {
 }
 
 link_nix_apps() {
-  [[ "$OS" == "macos" ]] || return
-  [[ -d "${PROFILE_PATH}/Applications" ]] || return
+  [[ "$OS" == "macos" ]] || return 0
+  [[ -d "${PROFILE_PATH}/Applications" ]] || return 0
 
   local app
   mkdir -p "${HOME}/Applications"
@@ -495,27 +580,13 @@ prompt_for_git_email() {
   done
 }
 
-configure_gcm_wsl_credential_helper() {
-  local host key
-  local helper="${HOME}/.local/bin/git-credential-manager-wsl"
-
-  command_exists git.exe \
-    || fail "Git for Windows is required for brokered Git authentication."
-  [[ -x "$helper" ]] \
-    || fail "Home Manager did not install ${helper}."
-
-  git config --global credential.helper manager-wsl
-  for host in github.com gist.github.com; do
-    key="credential.https://${host}.helper"
-    if git config --global --get-all "$key" >/dev/null; then
-      git config --global --unset-all "$key"
-    fi
-  done
-
-  git config --global credential.https://dev.azure.com.useHttpPath true
-  git.exe config --global credential.msauthUseBroker true
-
-  log "Git credential helper set to Windows GCM through the native WSL wrapper"
+remove_wsl_credential_helper() {
+  if git config --global --get-all credential.helper | grep -Fxq manager-wsl; then
+    git config --global --unset-all credential.helper '^manager-wsl$'
+  fi
+  if git config --global --get-all credential.https://dev.azure.com.helper | grep -Fxq manager-wsl; then
+    git config --global --unset-all credential.https://dev.azure.com.helper '^manager-wsl$'
+  fi
 }
 
 configure_git() {
@@ -545,7 +616,12 @@ configure_git() {
   if [[ "$IS_WSL" -eq 1 ]]; then
     git config --global core.fileMode false
     git config --global core.autocrlf input
-    configure_gcm_wsl_credential_helper
+    command_exists "/mnt/c/Program Files/Git/mingw64/bin/git-credential-manager.exe" \
+      || fail "Windows Git Credential Manager is required. Install Git for Windows first."
+    remove_wsl_credential_helper
+    git config --global --replace-all credential.helper \
+      '/mnt/c/Program\ Files/Git/mingw64/bin/git-credential-manager.exe'
+    git config --global credential.https://dev.azure.com.useHttpPath true
   fi
 }
 
@@ -575,7 +651,8 @@ main() {
     ensure_dev_sysctls
   fi
 
-  install_apt_prereqs
+  install_host_prereqs
+  install_azureauth
   ensure_rootless_container_prereqs
   install_nix
   source_nix

@@ -18,20 +18,21 @@ Nix is the source of truth for native tools, including:
 - Git, GitHub CLI, Jujutsu, Delta, and common data/markup tools
 - Linux-native PowerShell on Linux and WSL
 - .NET SDK 8 and 10 plus CSharpier
+- infrastructure tools including Terraform
 - Python tools including `uv`, `ruff`, and `ty`
 - Rust-based tools including `rust-analyzer`, `bottom`, `dust`, `taplo`,
   `tokei`, and Zellij
 - Ubuntu Mono, Symbols Nerd Font, and Symbola
 - Ghostty on native Linux and Apple Silicon macOS
 
-The bootstrap uses `fnm` from Nix to install Node.js LTS. npm owns the tools
-that are distributed natively through npm:
+The bootstrap uses `fnm` from Nix to refresh Node.js to the latest LTS on each
+run. npm owns the tools that are distributed natively through npm:
 
-- `@microsoft/artifacts-npm-credprovider@1.1.4`
+- `@microsoft/artifacts-npm-credprovider@1.2.1`
 - `typescript@7.0.2`
-- `markdownlint-cli2@0.23.2`
-- `oxfmt@0.66.0`
-- `oxlint@1.81.0`
+- `markdownlint-cli2@0.23.3`
+- `oxfmt@0.73.0`
+- `oxlint@1.88.0`
 
 The Artifacts npm credential provider is installed from Microsoft's public
 Azure Artifacts feed. Other npm tools continue to use the registry resolved
@@ -70,9 +71,11 @@ credentials.
 ## Supported platforms
 
 - Ubuntu 24.04 and 26.04, including WSL
+- Fedora 45 on a mutable installation, such as Workstation
 - Apple Silicon macOS
 
 The pinned nixpkgs revision no longer supports Intel macOS.
+Fedora Atomic desktops and Fedora on WSL are not supported.
 
 Ubuntu uses apt only for host integration prerequisites such as CA
 certificates, the Nix installer, and Secret Service support. Development tools
@@ -82,8 +85,25 @@ setuid `newuidmap` and `newgidmap` helpers, allocates subordinate UID/GID ranges
 when needed, and enables unprivileged user namespaces when the host has them
 disabled.
 
+Fedora uses dnf for equivalent host prerequisites, including
+`util-linux` and `policycoreutils`. The curl executable is requested by path so
+either Fedora's full or minimal curl package can satisfy it.
+
 When Nix is absent, the bootstrap downloads the pinned Determinate Nix
 installer release and verifies its published SHA-256 digest before running it.
+On Fedora, the installer provisions its SELinux policy using the host tools;
+the bootstrap does not disable SELinux.
+
+Fedora support covers host bootstrap and default-shell setup. Ghostty graphics,
+Copilot sandboxing, Playwright, and overlay sessions have not been validated on
+Fedora and are unchanged. The existing native Linux profile still includes
+Ghostty.
+
+To select the installed Zsh as the default shell on Ubuntu or Fedora:
+
+```bash
+./set-default-zsh.sh
+```
 
 WSL additionally configures systemd, editor/watch limits, browser integration,
 and Windows Git Credential Manager. It does not install Ghostty. VS Code is not
@@ -105,11 +125,28 @@ Home Manager owns:
 - `~/.config/starship.toml`
 - `~/.config/ghostty/config` outside WSL
 - `~/.copilot/instructions/playwright.instructions.md`
-- user-level browser, credential, and TypeScript language-server helpers
+- user-level browser and TypeScript language-server helpers
 - user fonts and platform-specific font discovery
 
 Global Git configuration includes identity, Delta, `zdiff3`, fetch pruning,
-and a default `main` branch. WSL also uses Windows Git Credential Manager.
+and a default `main` branch. WSL configures native Linux Git to use Windows Git
+Credential Manager directly for clone, fetch, and push. Install Git for Windows
+before running bootstrap; the expected executable is
+`/mnt/c/Program Files/Git/mingw64/bin/git-credential-manager.exe`.
+The bootstrap applies these settings and removes legacy `manager-wsl` entries:
+
+```bash
+git config --global credential.helper '/mnt/c/Program\ Files/Git/mingw64/bin/git-credential-manager.exe'
+git config --global credential.https://dev.azure.com.useHttpPath true
+```
+
+The global credential helper is replaced, while other host-specific helper
+settings remain intact. Azure DevOps credentials are matched by repository
+path. No per-command authorization-header prefix or custom wrapper is needed.
+
+WSL also installs the verified Linux AzureAuth release under
+`~/.local/share/azureauth`, with a link at `~/.local/bin/azureauth`, for tools that
+use AzureAuth independently of Git.
 
 ## Updating
 
