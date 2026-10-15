@@ -56,6 +56,102 @@ assert_equals() {
     || fail_test "Expected '${expected}', found '${actual}'"
 }
 
+test_os_detection() (
+  local os_release="${TEST_ROOT}/os-release"
+  local error_log="${TEST_ROOT}/os-detection-error"
+  local version wsl_state
+
+  uname() {
+    if [[ "${1:-}" == "-s" ]]; then
+      printf 'Linux\n'
+    else
+      command uname "$@"
+    fi
+  }
+
+  is_wsl() {
+    [[ "$wsl_state" -eq 1 ]]
+  }
+
+  for wsl_state in 0 1; do
+    for version in 24.04 26.04 26.10 27.04 ""; do
+      printf 'ID=ubuntu\nVERSION_ID=%s\n' "$version" >"$os_release"
+      IS_WSL=0
+      OS_RELEASE_FILE="$os_release" detect_os
+      assert_equals ubuntu "$OS"
+      assert_equals "$wsl_state" "$IS_WSL"
+    done
+  done
+
+  wsl_state=0
+  IS_WSL=0
+  printf 'ID=fedora\nVERSION_ID=45\n' >"$os_release"
+  OS_RELEASE_FILE="$os_release" detect_os
+  assert_equals fedora "$OS"
+
+  printf 'ID=fedora\nVERSION_ID=44\n' >"$os_release"
+  if (OS_RELEASE_FILE="$os_release" detect_os) >"$error_log" 2>&1; then
+    fail_test "Unexpectedly accepted Fedora 44"
+  fi
+  assert_contains "This script supports Fedora 45" "$error_log"
+
+  wsl_state=1
+  printf 'ID=fedora\nVERSION_ID=45\n' >"$os_release"
+  if (OS_RELEASE_FILE="$os_release" detect_os) >"$error_log" 2>&1; then
+    fail_test "Unexpectedly accepted Fedora on WSL"
+  fi
+  assert_contains "WSL bootstrap supports Ubuntu only" "$error_log"
+
+  printf 'ID=debian\nVERSION_ID=13\n' >"$os_release"
+  if (OS_RELEASE_FILE="$os_release" detect_os) >"$error_log" 2>&1; then
+    fail_test "Unexpectedly accepted an unsupported Linux distribution"
+  fi
+  assert_contains "Unsupported Linux distribution: debian" "$error_log"
+)
+
+test_ubuntu_host_prereqs() (
+  local command_log="${TEST_ROOT}/ubuntu-prereqs.log"
+
+  sudo() {
+    [[ "$1" == "apt-get" ]] || fail_test "Unexpected prerequisite command: $*"
+    printf '%s\n' "$*" >>"$command_log"
+  }
+
+  OS=ubuntu
+  install_host_prereqs
+  assert_contains "apt-get update" "$command_log"
+  assert_contains "apt-get install -y" "$command_log"
+  assert_contains '?name(^libicu[0-9]+$)' "$command_log"
+  assert_not_contains "libicu78" "$command_log"
+)
+
+test_dev_sysctls_preserve_memory_map_limit() (
+  local settings="${TEST_ROOT}/dev-sysctls.conf"
+  local command_log="${TEST_ROOT}/dev-sysctls.log"
+  local expected_conf="/etc/sysctl.d/99-${SCRIPT_MARKER}.conf"
+
+  sudo() {
+    case "$1" in
+      tee)
+        assert_equals "$expected_conf" "$2"
+        cat >"$settings"
+        ;;
+      sysctl)
+        printf '%s\n' "$*" >>"$command_log"
+        ;;
+      *)
+        fail_test "Unexpected sysctl setup command: $*"
+        ;;
+    esac
+  }
+
+  ensure_dev_sysctls
+  assert_contains "fs.inotify.max_user_watches = 524288" "$settings"
+  assert_contains "fs.inotify.max_user_instances = 512" "$settings"
+  assert_not_contains "vm.max_map_count" "$settings"
+  assert_contains "sysctl --quiet --load=${expected_conf}" "$command_log"
+)
+
 test_managed_config_is_idempotent() {
   local first_run="${TEST_ROOT}/first-run"
 
@@ -733,6 +829,22 @@ test_zsh_cache_tracks_store_identity() (
   ' cache-regression "$REPO_DIR" "$fixture"
 )
 
+if [[ "${1:-}" == "--os-detection-only" || "${1:-}" == "--host-only" ]]; then
+  (( $# == 1 )) || fail_test "Usage: ${0##*/} [--os-detection-only|--host-only]"
+  test_os_detection
+  if [[ "$1" == "--host-only" ]]; then
+    test_ubuntu_host_prereqs
+    test_dev_sysctls_preserve_memory_map_limit
+    printf 'Isolated host checks passed\n'
+  else
+    printf 'OS detection checks passed\n'
+  fi
+  exit 0
+fi
+
+test_os_detection
+test_ubuntu_host_prereqs
+test_dev_sysctls_preserve_memory_map_limit
 test_managed_config_is_idempotent
 test_home_manager_migration_safety
 test_wsl_browser_link_preserves_custom_opener

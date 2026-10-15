@@ -140,8 +140,9 @@ printf 'Testing Fedora and Ubuntu host detection\n'
 assert_detected_os fedora fedora 45
 assert_detected_os ubuntu ubuntu 24.04
 assert_detected_os ubuntu ubuntu 26.04
+assert_detected_os ubuntu ubuntu 26.10
+assert_detected_os ubuntu ubuntu 25.10
 assert_rejected_os "This script supports Fedora 45" fedora 44
-assert_rejected_os "This script supports Ubuntu 24.04 and 26.04" ubuntu 25.10
 
 printf 'Testing unsupported Fedora host variants\n'
 touch /run/ostree-booted

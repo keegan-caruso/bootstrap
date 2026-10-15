@@ -6,7 +6,7 @@ Main machine bootstrap. It handles:
 
 - OS detection
 - Nix installation and pinned profile provisioning
-- Ubuntu 24.04/26.04 and Fedora 45 host integration
+- Ubuntu host integration without a release-version gate, and Fedora 45 host integration
 - CLI, .NET, Python, Rust, fonts, and Ghostty through Nix
 - Node.js installation through `fnm`
 - npm-native tools using the configured npm registry

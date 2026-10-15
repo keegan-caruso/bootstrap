@@ -62,12 +62,6 @@ detect_os() {
       . "$os_release"
       case "${ID:-}" in
         ubuntu)
-          case "${VERSION_ID:-}" in
-            24.04|26.04) ;;
-            *)
-              fail "Unsupported Ubuntu version: ${VERSION_ID:-unknown}. This script supports Ubuntu 24.04 and 26.04."
-              ;;
-          esac
           OS="ubuntu"
           ;;
         fedora)
@@ -182,11 +176,9 @@ ensure_dev_sysctls() {
   log "Writing editor/watcher sysctl defaults to ${conf}"
   sudo tee "$conf" >/dev/null <<EOF
 # Managed by ${SCRIPT_MARKER}. Editor / file-watcher friendly defaults.
-# Bumps inotify limits for editors, language servers, tsc --watch, etc.,
-# and raises vm.max_map_count for bundlers and JVM/search tooling.
+# Inotify limits for editors, language servers, tsc --watch, etc.
 fs.inotify.max_user_watches = 524288
 fs.inotify.max_user_instances = 512
-vm.max_map_count = 262144
 EOF
   if ! sudo sysctl --quiet --load="$conf" 2>/dev/null; then
     log "sysctl --load failed; settings will apply after 'wsl --shutdown'"
@@ -281,6 +273,7 @@ install_host_prereqs() {
         ca-certificates \
         curl \
         gnome-keyring \
+        '?name(^libicu[0-9]+$)' \
         libsecret-1-0 \
         libsecret-tools \
         uidmap \

@@ -96,15 +96,21 @@ credentials.
 
 ## Supported platforms
 
-- Ubuntu 24.04 and 26.04, including WSL
+- Ubuntu, including WSL, without a release-version gate
 - Fedora 45 on a mutable installation, such as Workstation
 - Apple Silicon macOS
 
 The pinned nixpkgs revision no longer supports Intel macOS.
 Fedora Atomic desktops and Fedora on WSL are not supported.
 
+Accepting an Ubuntu release does not validate its package availability or
+complete provisioning. Host-detection regression tests cover Ubuntu 24.04,
+26.04, and 26.10, plus future and missing-version fixtures.
+
 Ubuntu uses apt only for host integration prerequisites such as CA
-certificates, the Nix installer, and Secret Service support. Development tools
+certificates, the ICU runtime for AzureAuth, the Nix installer, and Secret
+Service support. An APT package-name pattern selects the ICU runtime package
+for the current Ubuntu release instead of pinning its version. Development tools
 come from the pinned Nix flake, including Bubblewrap for Copilot CLI command
 sandboxing and rootless Podman and Buildah. The bootstrap installs Ubuntu's
 setuid `newuidmap` and `newgidmap` helpers, allocates subordinate UID/GID ranges
@@ -132,8 +138,10 @@ To select the installed Zsh as the default shell on Ubuntu or Fedora:
 ```
 
 WSL additionally configures systemd, editor/watch limits, browser integration,
-and Windows Git Credential Manager. It does not install Ghostty. VS Code is not
-installed or configured on any platform. The managed WSL shell path excludes
+and Windows Git Credential Manager. The editor/watch settings change only
+inotify limits and leave `vm.max_map_count` unchanged. It does not install
+Ghostty. VS Code is not installed or configured on any platform. The managed
+WSL shell path excludes
 the Windows VS Code CLI while preserving other Windows interoperability paths.
 
 ## Configuration
@@ -190,6 +198,16 @@ Home Manager generation.
 ./test-bootstrap.sh
 ./test-nix.sh
 ```
+
+To run only the isolated host checks without Nix, Zsh, or a container
+runtime:
+
+```bash
+./test-bootstrap.sh --host-only
+```
+
+These checks cover OS detection, Ubuntu prerequisite selection, and inotify
+settings that preserve the existing memory-map limit.
 
 The bootstrap integration test uses an isolated temporary home directory and
 stubbed external commands. It checks idempotent managed configuration,
