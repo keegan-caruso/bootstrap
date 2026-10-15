@@ -51,6 +51,10 @@ tool_environment="$(
   nix build --no-link --print-out-paths \
     "path:${FLAKE_DIR}#$(nix_tool_output)"
 )"
+[[ -x "${tool_environment}/bin/zoxide" ]] || {
+  printf 'The bootstrap profile must always provision zoxide\n' >&2
+  exit 1
+}
 [[ ! -e "${tool_environment}/bin/csharp-ls" && ! -L "${tool_environment}/bin/csharp-ls" ]] || {
   printf 'The bootstrap profile must not provision a C# language server\n' >&2
   exit 1

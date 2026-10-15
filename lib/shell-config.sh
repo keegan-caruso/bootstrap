@@ -11,8 +11,9 @@ configure_shell_profile() {
     profile="$(<"$profile_file")" \
       || fail "Cannot read shell profile: ${profile_file}"
   else
-    printf 'starship: rich prompt and zoxide navigation\n'
-    printf 'minimal: directory-only prompt, no Git detection or zoxide, start in ~/repos when present\n'
+    printf 'starship: rich prompt\n'
+    printf 'minimal: directory-only prompt, no Git detection, start in ~/repos when present\n'
+    printf 'Both profiles enable zoxide navigation and directory tracking.\n'
     while true; do
       read -r -p "Shell profile [starship/minimal] (starship): " profile \
         || fail "Shell profile selection requires input; set BOOTSTRAP_SHELL_PROFILE=starship or minimal."

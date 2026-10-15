@@ -13,9 +13,10 @@ for the same command.
 
 On the first run, bootstrap asks which shell profile to use. Press Enter for
 the existing `starship` default, or choose `minimal` for a directory-only Zsh
-prompt without Starship, Git-status detection, or zoxide tracking and jump
-commands. The minimal profile starts interactive shells in `~/repos` when
-that directory exists; otherwise it preserves the current directory. Both
+prompt without Starship or Git-status detection. Zoxide is installed and
+initialized with either profile, including directory tracking and the `z` and
+`zi` jump commands. The minimal profile starts interactive shells in `~/repos`
+when that directory exists; otherwise it preserves the current directory. Both
 profiles retain completion, autosuggestions, syntax highlighting, fzf, and
 the lazy Node.js setup.
 
@@ -30,10 +31,10 @@ BOOTSTRAP_SHELL_PROFILE=starship ./bootstrap-nix.sh
 
 Open a new shell or run `exec zsh` after changing profiles. Existing
 installations without a saved choice continue using Starship until bootstrap
-is rerun. The minimal profile skips Starship and zoxide initialization rather
-than starting them and disabling their hooks afterward. Their packages and
-existing data remain installed, and user-owned `.zshrc` customizations are
-preserved.
+is rerun. The minimal profile skips Starship initialization rather than
+starting it and disabling its hooks afterward. Switching prompt profiles does
+not disable zoxide integration. Both packages and their existing data remain
+installed, and user-owned `.zshrc` customizations are preserved.
 
 ## Package ownership
 
@@ -214,7 +215,8 @@ stubbed external commands. It checks idempotent managed configuration,
 Homebrew-block removal, npm registry overrides, and WSL/native flake output
 selection, plus legacy tool cleanup, without modifying the real home directory.
 It also runs `test-shell-profile.sh`, which checks saved profile selection,
-switching profiles, and minimal shells without Git, Starship, or zoxide calls.
+switching profiles, zoxide integration without duplicate directory hooks, and
+minimal shells without Git or Starship calls.
 
 The Nix test runs the bootstrap integration test, evaluates every supported
 system, and builds the tool environment for the current machine. It does not

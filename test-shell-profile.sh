@@ -20,10 +20,13 @@ fail_test() {
 test_profile_selection() {
   local profile_file="${HOME}/.config/codex-dev-shell/shell-profile"
   local error_log="${TEST_ROOT}/selection-error"
+  local selection_log="${TEST_ROOT}/selection-output"
 
-  configure_shell_profile <<<"" >/dev/null
+  configure_shell_profile <<<"" >"$selection_log"
   [[ "$(<"$profile_file")" == starship ]] \
     || fail_test "The first-run default must remain starship"
+  grep -Fq "Both profiles enable zoxide navigation and directory tracking." "$selection_log" \
+    || fail_test "Profile selection did not describe shared zoxide integration"
 
   rm "$profile_file"
   configure_shell_profile <<<'invalid
@@ -132,6 +135,16 @@ test_runtime_profiles() {
   ZSH_NONINTERACTIVE_SAFE=1 \
     "$zsh_command" -dfi -c '
       check() { "$@" || { print -u2 -- "${funcfiletrace[1]}: runtime assertion failed: $*"; exit 1; }; }
+      check_zoxide() {
+        local -a hooks
+        check test "${+functions[z]}" = 1
+        check test "${+functions[zi]}" = 1
+        check test "${+functions[__zoxide_hook]}" = 1
+        check test "${+widgets[__zoxide_z_complete_helper]}" = 1
+        check test "${+_comps[z]}" = 1
+        hooks=("${(@M)chpwd_functions:#__zoxide_hook}")
+        check test "${#hooks}" = 1
+      }
       config="$HOME/.config/codex-dev-shell/zshrc"
       profile_file="$HOME/.config/codex-dev-shell/shell-profile"
       cd -- "$1/start"
@@ -142,26 +155,30 @@ test_runtime_profiles() {
       check test -z "$RPROMPT"
       check test "$PROMPT2" = "%_> "
       check test "$PWD" = "$HOME/repos"
-      check test ! -s "$PROFILE_COMMAND_LOG"
-      check test "${+functions[z]}" = 0
-      check test "${+functions[zi]}" = 0
+      check_zoxide
+      check grep -Fxq "zoxide init zsh" "$PROFILE_COMMAND_LOG"
+      check grep -Fxq zoxide-add "$PROFILE_COMMAND_LOG"
+      check test "$(grep -Ec "^(starship|git) " "$PROFILE_COMMAND_LOG")" = 0
       check test "$FZF_CTRL_T_COMMAND" = "$FZF_DEFAULT_COMMAND"
       check test "${+functions[_fnm_lazy_load]}" = 1
+      : >"$PROFILE_COMMAND_LOG"
       cd -- "$1/start"
       cd -- "$HOME/repos"
-      check test ! -s "$PROFILE_COMMAND_LOG"
+      check test "$(grep -Fxc zoxide-add "$PROFILE_COMMAND_LOG")" = 2
+      check test "$(grep -Ec "^(starship|git) " "$PROFILE_COMMAND_LOG")" = 0
 
       rmdir "$HOME/repos"
       cd -- "$1/start"
       source "$config" || exit 1
       check test "$PWD" = "$1/start"
+      check_zoxide
       mkdir "$HOME/repos"
 
       rm "$profile_file"
+      : >"$PROFILE_COMMAND_LOG"
       source "$config" || exit 1
       check test "$PROMPT" = test-starship
-      check test "${+functions[z]}" = 1
-      check test "${+functions[zi]}" = 1
+      check_zoxide
       check test "$PWD" = "$1/start"
       check grep -Fxq "starship init zsh" "$PROFILE_COMMAND_LOG"
       check grep -Fxq "zoxide init zsh" "$PROFILE_COMMAND_LOG"
@@ -175,21 +192,22 @@ test_runtime_profiles() {
       source "$config" || exit 1
       check test "$PROMPT" = "%~ %# "
       check test "$PWD" = "$HOME/repos"
-      check test ! -s "$PROFILE_COMMAND_LOG"
-      check test "${+functions[z]}" = 0
-      check test "${+functions[zi]}" = 0
-      check test "${+functions[__zoxide_hook]}" = 0
-      check test "${+widgets[__zoxide_z_complete_helper]}" = 0
-      check test "${+_comps[z]}" = 0
+      check_zoxide
+      check grep -Fxq "zoxide init zsh" "$PROFILE_COMMAND_LOG"
+      check test "$(grep -Ec "^(starship|git) " "$PROFILE_COMMAND_LOG")" = 0
       [[ " ${precmd_functions[*]} ${preexec_functions[*]} ${chpwd_functions[*]} " != *starship* &&
-         " ${precmd_functions[*]} ${chpwd_functions[*]} " != *vcs_info* &&
-         " ${precmd_functions[*]} ${chpwd_functions[*]} " != *__zoxide* ]] || exit 1
+         " ${precmd_functions[*]} ${chpwd_functions[*]} " != *vcs_info* ]] || exit 1
 
       print -r -- starship >"$profile_file"
       source "$config" || exit 1
       check test "$PROMPT" = test-starship
-      check test "${+functions[z]}" = 1
-      check test "${+functions[zi]}" = 1
+      check_zoxide
+      source "$config" || exit 1
+      check_zoxide
+      : >"$PROFILE_COMMAND_LOG"
+      cd -- "$1/start"
+      cd -- "$HOME/repos"
+      check test "$(grep -Fxc zoxide-add "$PROFILE_COMMAND_LOG")" = 2
 
       print -r -- invalid >"$profile_file"
       : >"$PROFILE_COMMAND_LOG"
