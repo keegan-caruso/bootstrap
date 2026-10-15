@@ -642,6 +642,7 @@ write_jj_config() {
 
 main() {
   detect_os
+  configure_shell_profile
   require_sudo
 
   if [[ "$IS_WSL" -eq 1 ]]; then

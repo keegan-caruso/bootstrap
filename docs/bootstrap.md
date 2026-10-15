@@ -9,6 +9,32 @@ The main bootstrap entry point is:
 `bootstrap-dev-shell.sh` and `bootstrap-wsl-nix.sh` are compatibility wrappers
 for the same command.
 
+## Shell profiles
+
+On the first run, bootstrap asks which shell profile to use. Press Enter for
+the existing `starship` default, or choose `minimal` for a directory-only Zsh
+prompt without Starship, Git-status detection, or zoxide tracking and jump
+commands. The minimal profile starts interactive shells in `~/repos` when
+that directory exists; otherwise it preserves the current directory. Both
+profiles retain completion, autosuggestions, syntax highlighting, fzf, and
+the lazy Node.js setup.
+
+The choice is saved in `~/.config/codex-dev-shell/shell-profile`. Later
+bootstrap runs reuse it without prompting, and `update-nix.sh` preserves it.
+For scripted selection or to change an existing choice:
+
+```bash
+BOOTSTRAP_SHELL_PROFILE=minimal ./bootstrap-nix.sh
+BOOTSTRAP_SHELL_PROFILE=starship ./bootstrap-nix.sh
+```
+
+Open a new shell or run `exec zsh` after changing profiles. Existing
+installations without a saved choice continue using Starship until bootstrap
+is rerun. The minimal profile skips Starship and zoxide initialization rather
+than starting them and disabling their hooks afterward. Their packages and
+existing data remain installed, and user-owned `.zshrc` customizations are
+preserved.
+
 ## Package ownership
 
 Nix is the source of truth for native tools, including:
@@ -169,6 +195,8 @@ The bootstrap integration test uses an isolated temporary home directory and
 stubbed external commands. It checks idempotent managed configuration,
 Homebrew-block removal, npm registry overrides, and WSL/native flake output
 selection, plus legacy tool cleanup, without modifying the real home directory.
+It also runs `test-shell-profile.sh`, which checks saved profile selection,
+switching profiles, and minimal shells without Git, Starship, or zoxide calls.
 
 The Nix test runs the bootstrap integration test, evaluates every supported
 system, and builds the tool environment for the current machine. It does not

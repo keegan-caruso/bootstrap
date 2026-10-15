@@ -66,7 +66,20 @@ if [[ -n "$_fnm_binary" ]]; then
 fi
 
 # zoxide
-if command -v zoxide >/dev/null 2>&1; then
+if [[ "$_bootstrap_shell_profile" == minimal ]]; then
+  autoload -Uz add-zsh-hook
+  add-zsh-hook -d chpwd __zoxide_hook
+  add-zsh-hook -d precmd __zoxide_hook
+  if (( ${+functions[__zoxide_hook]} )); then
+    if (( ${+functions[compdef]} )); then
+      compdef -d z
+    fi
+    if [[ -n ${widgets[__zoxide_z_complete_helper]:-} ]]; then
+      zle -D __zoxide_z_complete_helper
+    fi
+    unfunction -m '__zoxide_*' z zi
+  fi
+elif command -v zoxide >/dev/null 2>&1; then
   eval "$(zoxide init zsh)"
 fi
 
@@ -127,3 +140,8 @@ if [[ -o interactive && -z "${ZSH_NONINTERACTIVE_SAFE:-}" ]]; then
     export ARTIFACTS_CREDENTIALPROVIDER_MSAL_ALLOW_BROKER=false
   fi
 fi
+
+if [[ "$_bootstrap_shell_profile" == minimal && -o interactive && -d "$HOME/repos" ]]; then
+  builtin cd -- "$HOME/repos"
+fi
+unset _bootstrap_shell_profile

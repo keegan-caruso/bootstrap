@@ -644,6 +644,7 @@ test_update_reconciles_shell_loaders() (
   printf 'export DOTNET_ROOT=/updated-runtime\n' >"${HOME}/.config/codex-dev-shell/zshrc"
   printf '# user content\n# >>> codex-dev-shell:aliases\nexport DOTNET_ROOT=/old-runtime\n# <<< codex-dev-shell:aliases\n' >"${HOME}/.bashrc"
   printf '# user content\n# >>> codex-dev-shell:path\nexport DOTNET_ROOT=/old-runtime\n# <<< codex-dev-shell:path\n' >"${HOME}/.zshrc"
+  printf 'minimal\n' >"${HOME}/.config/codex-dev-shell/shell-profile"
 
   activate_nix() { :; }
   activate_home_manager() { :; }
@@ -668,6 +669,7 @@ test_update_reconciles_shell_loaders() (
   assert_not_contains /old-runtime "${HOME}/.zshrc"
   assert_marker_once "# >>> ${SCRIPT_MARKER}:aliases" "${HOME}/.bashrc"
   assert_marker_once "# >>> ${SCRIPT_MARKER}:home-manager" "${HOME}/.zshrc"
+  assert_equals minimal "$(<"${HOME}/.config/codex-dev-shell/shell-profile")"
   assert_equals /updated-runtime "$(env -u DOTNET_ROOT bash --noprofile --rcfile "${HOME}/.bashrc" -ic 'printf "%s" "$DOTNET_ROOT"' 2>/dev/null)"
   assert_equals /updated-runtime "$(env -u DOTNET_ROOT zsh -ic 'printf "%s" "$DOTNET_ROOT"')"
 )
@@ -750,6 +752,7 @@ test_update_reconciles_shell_loaders
 test_node_path_fallback
 test_zsh_cache_tracks_store_identity
 
+bash "${REPO_DIR}/test-shell-profile.sh"
 bash "${REPO_DIR}/test-linux-host.sh"
 
 printf 'Bootstrap integration checks passed\n'

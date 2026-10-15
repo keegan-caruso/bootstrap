@@ -1,5 +1,46 @@
 #!/usr/bin/env bash
 
+configure_shell_profile() {
+  local profile_file="${HOME}/.config/codex-dev-shell/shell-profile"
+  local profile
+  local tmp
+
+  if [[ "${BOOTSTRAP_SHELL_PROFILE+x}" ]]; then
+    profile="$BOOTSTRAP_SHELL_PROFILE"
+  elif [[ -e "$profile_file" || -L "$profile_file" ]]; then
+    profile="$(<"$profile_file")" \
+      || fail "Cannot read shell profile: ${profile_file}"
+  else
+    printf 'starship: rich prompt and zoxide navigation\n'
+    printf 'minimal: directory-only prompt, no Git detection or zoxide, start in ~/repos when present\n'
+    while true; do
+      read -r -p "Shell profile [starship/minimal] (starship): " profile \
+        || fail "Shell profile selection requires input; set BOOTSTRAP_SHELL_PROFILE=starship or minimal."
+      profile="${profile:-starship}"
+      case "$profile" in
+        starship|minimal) break ;;
+        *) printf 'Choose starship or minimal.\n' ;;
+      esac
+    done
+  fi
+
+  case "$profile" in
+    starship|minimal) ;;
+    *) fail "Invalid shell profile '${profile}'; choose starship or minimal." ;;
+  esac
+
+  if [[ ! -f "$profile_file" || "$(<"$profile_file")" != "$profile" ]]; then
+    mkdir -p "$(dirname "$profile_file")"
+    tmp="$(mktemp "${profile_file}.XXXXXX")" \
+      || fail "Failed to create temporary shell profile."
+    if ! { printf '%s\n' "$profile" >"$tmp" && mv "$tmp" "$profile_file"; }; then
+      rm -f "$tmp"
+      fail "Failed to save shell profile: ${profile_file}"
+    fi
+  fi
+  log "Shell profile: ${profile}"
+}
+
 ensure_file() {
   local file="$1"
   mkdir -p "$(dirname "$file")"
