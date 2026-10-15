@@ -34,6 +34,9 @@ printf 'Testing Copilot sandbox configuration\n'
 printf 'Testing immutable overlay lower directories\n'
 "${SCRIPT_DIR}/test-nix-wt.sh"
 
+printf 'Testing Nix workspace containers\n'
+"${SCRIPT_DIR}/test-nix-container-wt.sh"
+
 printf 'Checking Nix formatting\n'
 (
   cd "$FLAKE_DIR"

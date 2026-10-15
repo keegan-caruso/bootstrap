@@ -230,6 +230,50 @@
           desktopTools = with pkgs; [
             ghostty
           ];
+          workspaceContainerTools = pkgs.buildEnv {
+            name = "workspace-container-tools";
+            paths = with pkgs; [
+              bashInteractive
+              cacert
+              coreutils
+              curl
+              findutils
+              gh
+              git
+              gnugrep
+              gnused
+              jq
+              jujutsu
+              less
+              openssh
+              ripgrep
+              terraform
+              zsh
+            ];
+          };
+          workspaceContainer =
+            if pkgs.stdenv.hostPlatform.isLinux then
+              pkgs.dockerTools.streamLayeredImage {
+                name = "bootstrap-workspace";
+                tag = "latest";
+                maxLayers = 20;
+                contents = [ workspaceContainerTools ];
+                extraCommands = ''
+                  mkdir -p home/dev tmp workspace
+                  chmod 1777 tmp
+                '';
+                config = {
+                  Cmd = [ "${pkgs.zsh}/bin/zsh" ];
+                  Env = [
+                    "HOME=/home/dev"
+                    "PATH=${workspaceContainerTools}/bin"
+                    "SSL_CERT_FILE=${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt"
+                  ];
+                  WorkingDir = "/workspace";
+                };
+              }
+            else
+              null;
         in
         {
           inherit
@@ -239,6 +283,7 @@
             fonts
             pkgs
             playwrightRun
+            workspaceContainer
             wslTools
             ;
           default = pkgs.buildEnv {
@@ -296,6 +341,9 @@
         in
         {
           inherit (p) default desktop workstation;
+        }
+        // p.pkgs.lib.optionalAttrs p.pkgs.stdenv.hostPlatform.isLinux {
+          workspace-container = p.workspaceContainer;
         }
       );
 

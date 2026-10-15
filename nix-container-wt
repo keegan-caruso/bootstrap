@@ -1,0 +1,159 @@
+#!/usr/bin/env zsh
+
+emulate -L zsh
+setopt ERR_EXIT NO_UNSET PIPE_FAIL
+
+script_name="${0:t}"
+script_dir="${0:A:h}"
+script_path="${0:A}"
+flake_path="${script_dir}/nix"
+
+usage() {
+  print -u2 "Usage: ${script_name} <overlay-name> [-C repository] -- <command> [args...]"
+}
+
+fail() {
+  print -u2 "[${script_name}] $*"
+  exit 1
+}
+
+activate_nix() {
+  local nix_profile
+
+  command -v nix >/dev/null 2>&1 && return
+  for nix_profile in \
+    /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh \
+    "${HOME}/.nix-profile/etc/profile.d/nix.sh"
+  do
+    if [[ -r "$nix_profile" ]]; then
+      source "$nix_profile"
+      command -v nix >/dev/null 2>&1 && return
+    fi
+  done
+
+  fail "Nix is not installed. Run ${script_dir}/bootstrap-nix.sh first."
+}
+
+if [[ "${1:-}" == "--run-container" ]]; then
+  (( $# >= 5 )) || fail "Internal container invocation is incomplete."
+  shift
+  image_ref="$1"
+  container_home="$2"
+  container_name="$3"
+  shift 3
+  [[ "$1" == "--" ]] || fail "Internal container command separator is missing."
+  shift
+  (( $# > 0 )) || fail "Internal container command is missing."
+
+  mkdir -p "$container_home"
+  podman_args=(
+    run
+    --rm
+    --name "$container_name"
+    --hostname "$container_name"
+    --security-opt label=disable
+    --userns=keep-id
+    --workdir /workspace
+    --volume "${PWD}:/workspace:rw"
+    --volume "${container_home}:/home/dev:rw"
+    --env HOME=/home/dev
+    --env USER=dev
+  )
+  [[ -t 0 ]] && podman_args+=(--interactive)
+  [[ -t 1 ]] && podman_args+=(--tty)
+
+  exec podman "${podman_args[@]}" "$image_ref" "$@"
+fi
+
+if (( $# < 3 )); then
+  usage
+  exit 2
+fi
+
+overlay_name="$1"
+shift
+repo_path="."
+if [[ "${1:-}" == "-C" ]]; then
+  (( $# >= 3 )) || {
+    usage
+    exit 2
+  }
+  repo_path="$2"
+  shift 2
+fi
+[[ "${1:-}" == "--" ]] || {
+  usage
+  exit 2
+}
+shift
+(( $# > 0 )) || {
+  usage
+  exit 2
+}
+command_args=("$@")
+
+if [[ "$overlay_name" != [A-Za-z0-9]* \
+  || "$overlay_name" == *[^A-Za-z0-9._-]* ]]; then
+  fail "Overlay name must start with a letter or number and contain only letters, numbers, dots, underscores, or hyphens."
+fi
+
+activate_nix
+[[ "$(uname -s)" == "Linux" ]] \
+  || fail "Nix workspace containers are currently supported on Linux only."
+for required_command in cksum git nix podman; do
+  command -v "$required_command" >/dev/null 2>&1 \
+    || fail "Required command not found: ${required_command}"
+done
+
+repo_root="$(git -C "$repo_path" rev-parse --show-toplevel 2>/dev/null)" \
+  || fail "Path is not inside a Git repository: ${repo_path}"
+repo_root="${repo_root:A}"
+[[ -z "$(git -C "$repo_root" status --porcelain)" ]] \
+  || fail "Repository must be clean before creating or reopening a container workspace: ${repo_root}"
+repo_name="${repo_root:t}"
+repo_slug="${repo_name//[^A-Za-z0-9._-]/-}"
+repo_slug="${repo_slug[1,48]}"
+repo_id="$(print -rn -- "$repo_root" | cksum | awk '{print $1}')"
+repo_key="${repo_slug}-${repo_id}"
+container_state="${XDG_STATE_HOME:-${HOME}/.local/state}/nix-container-wt/${repo_key}/${overlay_name}"
+container_home="${container_state}/home"
+container_name="nix-${repo_slug}-${overlay_name}-$$"
+container_name="${container_name[1,63]}"
+
+print "[${script_name}] Building Nix workspace image"
+image_streamer="$(nix build \
+  --no-link \
+  --print-out-paths \
+  "path:${flake_path}#workspace-container")"
+image_basename="${image_streamer:t}"
+image_tag="${image_basename%%-*}"
+image_ref="localhost/bootstrap-workspace:${image_tag}"
+if ! (
+  cd /
+  podman image exists "$image_ref"
+); then
+  print "[${script_name}] Loading ${image_ref}"
+  stream_log="$(mktemp)"
+  if ! (
+    cd /
+    "$image_streamer" 2>"$stream_log" | podman load --quiet
+    podman tag localhost/bootstrap-workspace:latest "$image_ref"
+  ); then
+    cat "$stream_log" >&2
+    rm -f "$stream_log"
+    fail "Failed to stream the Nix workspace image into Podman."
+  fi
+  rm -f "$stream_log"
+fi
+mkdir -p "$container_home"
+
+exec "${script_dir}/nix-wt" "$overlay_name" -C "$repo_root" -- \
+  env \
+    NIX_CONTAINER_WORKSPACE=1 \
+    "$script_path" \
+    --run-container \
+    "$image_ref" \
+    "$container_home" \
+    "$container_name" \
+    -- \
+    "${command_args[@]}"

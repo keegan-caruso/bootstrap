@@ -227,3 +227,28 @@ to the user. Copilot's MXC policy provides that separate security boundary.
 The name must start with a letter or number and may contain letters, numbers,
 dots, underscores, and hyphens. The Nix dev shell provides `fuse-overlayfs`
 and the required mount utilities.
+
+## `nix-container-wt`
+
+Streams a minimal, 20-layer OCI development image from the pinned Nix flake
+directly into rootless Podman, then runs it over a persistent `nix-wt`
+workspace overlay. The assembled image tarball is not stored in the Nix store.
+
+```zsh
+./nix-container-wt experiment -C /path/to/repository -- zsh
+```
+
+The source repository remains unchanged. Workspace writes persist in the
+`nix-wt` overlay, while the container receives a separate persistent home under
+`${XDG_STATE_HOME:-~/.local/state}/nix-container-wt/`. Reopening the same
+repository and overlay name restores both layers.
+
+The container runs with `--userns=keep-id` and mounts only:
+
+- the overlay workspace at `/workspace`
+- its persistent home at `/home/dev`
+
+It does not mount the host home, Nix store, GitHub configuration, SSH agent,
+container socket, or other host paths. Outbound networking remains available.
+The OCI image intentionally contains a small experiment-oriented tool set
+rather than every package in the host development profile.
