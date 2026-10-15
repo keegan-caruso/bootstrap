@@ -22,7 +22,7 @@ The flake exposes the official `nixfmt` from the pinned nixpkgs revision as its
 formatter.
 
 The development shell and Home Manager shell startup files export `DOTNET_ROOT`
-from the same combined .NET SDK package. Native .NET apphosts (including test
+from the same .NET 10 SDK package. Native .NET apphosts (including test
 executables launched by `dotnet test`) need this to locate `libhostfxr` in the
 Nix store; putting `dotnet` on `PATH` alone is insufficient. This also applies
 to `nix-wt` and `sr-wt` child processes.
@@ -37,9 +37,10 @@ not by Nix.
 The CLI environment includes nixpkgs' latest Python 3 runtime. The package
 provides both `python` and `python3` as aliases for the same interpreter.
 
-The environment provides .NET SDKs and CSharpier, but does not install a C#
-language server or manage `~/.copilot/lsp-config.json`. Language-server setup
-remains user-managed.
+The environment provides .NET SDK 10, CSharpier, `ilspycmd` (aliased as `ilspy`),
+and `dotnet-csi` (aliased as `csi`), but does not install a C# language server
+or manage `~/.copilot/lsp-config.json`. Language-server setup remains
+user-managed.
 
 Linux profiles include rootless Podman and Buildah, plus `bubblewrap`,
 `slirp4netns`, `fuse-overlayfs`, and `iptables`. The container command wrappers

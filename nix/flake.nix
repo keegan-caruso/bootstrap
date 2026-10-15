@@ -129,10 +129,27 @@
               esac
             '';
           };
-          dotnetSdk = pkgs.dotnetCorePackages.combinePackages [
-            pkgs.dotnetCorePackages.sdk_8_0
-            pkgs.dotnetCorePackages.sdk_10_0
-          ];
+          dotnetSdk = pkgs.dotnetCorePackages.sdk_10_0;
+          dotnetCsi = pkgs.buildDotnetGlobalTool {
+            pname = "dotnet-csi";
+            version = "1.2.3";
+            nugetHash = "sha256-RjX4CaIkb6UdoNYSOXSDGKdPm+Yaqbg2PQZArna9yPE=";
+            dotnet-sdk = dotnetSdk;
+            dotnet-runtime = dotnetSdk;
+            postFixup = ''
+              ln -s dotnet-csi "$out/bin/csi"
+            '';
+          };
+          ilspycmd = pkgs.buildDotnetGlobalTool {
+            pname = "ilspycmd";
+            version = "11.1.0.9782";
+            nugetHash = "sha256-dMB/rK8YUMeKd5/FCQMfdW4cDeJLGlNvM2PX74HOAB8=";
+            dotnet-sdk = dotnetSdk;
+            dotnet-runtime = dotnetSdk;
+            postFixup = ''
+              ln -s ilspycmd "$out/bin/ilspy"
+            '';
+          };
           azureCli = pkgs.azure-cli.withExtensions [
             pkgs.azure-cli-extensions.azure-devops
             pkgs.azure-cli-extensions.log-analytics
@@ -149,6 +166,7 @@
               csharpier
               delta
               doggo
+              dotnetCsi
               duf
               dust
               eza
@@ -159,6 +177,7 @@
               gh
               git
               hyperfine
+              ilspycmd
               jq
               jujutsu
               ncdu

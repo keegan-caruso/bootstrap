@@ -43,7 +43,7 @@ Nix is the source of truth for native tools, including:
   `zoxide`, Starship, and Zsh plugins
 - Git, GitHub CLI, Jujutsu, Delta, and common data/markup tools
 - Linux-native PowerShell on Linux and WSL
-- .NET SDK 8 and 10 plus CSharpier
+- .NET SDK 10 plus CSharpier, `ilspycmd` (`ilspy`), and `dotnet-csi` (`csi`)
 - infrastructure tools including Terraform
 - Python tools including `uv`, `ruff`, and `ty`
 - Rust-based tools including `rust-analyzer`, `bottom`, `dust`, `taplo`,

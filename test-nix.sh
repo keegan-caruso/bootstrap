@@ -83,7 +83,7 @@ printf 'Testing .NET runtime discovery in development and generated home shells\
 env -u DOTNET_ROOT nix develop "path:${FLAKE_DIR}" --command bash -euc '
   test -x "$DOTNET_ROOT/dotnet"
   test -d "$DOTNET_ROOT/host/fxr"
-  test -d "$DOTNET_ROOT/shared/Microsoft.NETCore.App/8.0."*
+  test -d "$DOTNET_ROOT/shared/Microsoft.NETCore.App/10.0."*
   expected_root="$DOTNET_ROOT"
   zsh_root="$(env -u DOTNET_ROOT zsh -f -c \
     '\''source "$1"; printenv DOTNET_ROOT'\'' runtime-discovery "$1/.zshenv")"
@@ -107,6 +107,12 @@ env -u FNM_MULTISHELL_PATH -u FNM_DIR \
     test "$(readlink -f "$(command -v python)")" = "$(readlink -f "$(command -v python3)")"
     python --version
     python3 --version
+    test "$(readlink -f "$(command -v csi)")" = "$(readlink -f "$(command -v dotnet-csi)")"
+    csi --version
+    dotnet-csi --version
+    test "$(readlink -f "$(command -v ilspy)")" = "$(readlink -f "$(command -v ilspycmd)")"
+    ilspy --version
+    ilspycmd --version
     terraform version
   '
 
