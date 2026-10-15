@@ -1,5 +1,33 @@
+_bootstrap_shell_profile=starship
+_bootstrap_shell_profile_file="$HOME/.config/codex-dev-shell/shell-profile"
+if [[ -e "$_bootstrap_shell_profile_file" || -L "$_bootstrap_shell_profile_file" ]]; then
+  _bootstrap_shell_profile="$(<"$_bootstrap_shell_profile_file")" || {
+    print -u2 "zsh: cannot read shell profile: $_bootstrap_shell_profile_file"
+    return 1
+  }
+fi
+case "$_bootstrap_shell_profile" in
+  starship|minimal) ;;
+  *)
+    print -u2 "zsh: invalid shell profile '$_bootstrap_shell_profile'; choose starship or minimal"
+    return 1
+    ;;
+esac
+unset _bootstrap_shell_profile_file
+
 # starship
-_starship_command="$(command -v starship 2>/dev/null)"
+_starship_command=""
+if [[ "$_bootstrap_shell_profile" == starship ]]; then
+  _starship_command="$(command -v starship 2>/dev/null)"
+else
+  autoload -Uz add-zsh-hook
+  add-zsh-hook -d precmd prompt_starship_precmd
+  add-zsh-hook -d preexec prompt_starship_preexec
+  add-zsh-hook -d precmd vcs_info
+  PROMPT='%~ %# '
+  RPROMPT=''
+  PROMPT2='%_> '
+fi
 if [[ -n "$_starship_command" ]]; then
   _starship_cache_file="${_zsh_startup_cache_dir}/starship.zsh"
   _starship_identity_file="${_starship_cache_file}.command"

@@ -23,6 +23,11 @@ Run:
 `bootstrap-dev-shell.sh` and `bootstrap-wsl-nix.sh` delegate to this command
 for compatibility.
 
+The first run offers `starship` (the default) or `minimal`, then remembers
+the choice. Set `BOOTSTRAP_SHELL_PROFILE=minimal` or
+`BOOTSTRAP_SHELL_PROFILE=starship` to select or change it without the shell
+profile prompt. See [Shell profiles](bootstrap.md#shell-profiles) for details.
+
 ## `set-default-zsh.sh`
 
 Registers the installed Zsh in `/etc/shells` and selects it as the user's
