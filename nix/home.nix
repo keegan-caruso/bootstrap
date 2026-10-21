@@ -63,9 +63,17 @@ in
       ".copilot/instructions/playwright.instructions.md" = {
         source = template "copilot/playwright.instructions.md";
       };
+      ".copilot/extensions/azure-devops" = {
+        source = template "copilot/extensions/azure-devops";
+      };
       ".local/bin/typescript-language-server" = {
         source = template "typescript-language-server";
         executable = true;
+      };
+    }
+    // lib.optionalAttrs pkgs.stdenv.hostPlatform.isLinux {
+      ".copilot/extensions/clipboard-tools" = {
+        source = template "copilot/extensions/clipboard-tools";
       };
     }
     // lib.optionalAttrs (!isWsl) {

@@ -20,6 +20,8 @@ This repo sets up:
   tracked template files
 - [docs/wsl-btrfs.md](docs/wsl-btrfs.md):
   separate Btrfs data VHDX setup and automatic mounting for WSL
+- [docs/copilot-extensions.md](docs/copilot-extensions.md):
+  user-scoped Azure DevOps and Linux clipboard tools for Copilot CLI
 - [docs/tools/readme.md](docs/tools/readme.md):
   installed tool reference pages
 

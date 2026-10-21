@@ -17,6 +17,8 @@ existing shell files and renders the identity-dependent Jujutsu configuration.
 - `nix/templates/ghostty/config`
 - `nix/templates/jj/config.toml.tmpl`
 - `nix/templates/copilot/playwright.instructions.md`
+- `nix/templates/copilot/extensions/azure-devops/`
+- `nix/templates/copilot/extensions/clipboard-tools/`
 - `nix/templates/wsl-browser`
 
 ## What They Feed
@@ -31,9 +33,16 @@ existing shell files and renders the identity-dependent Jujutsu configuration.
 - `nix/templates/ghostty/config` -> `~/.config/ghostty/config`
 - `nix/templates/copilot/playwright.instructions.md` ->
   `~/.copilot/instructions/playwright.instructions.md`
+- `nix/templates/copilot/extensions/azure-devops/` ->
+  `~/.copilot/extensions/azure-devops/`
+- `nix/templates/copilot/extensions/clipboard-tools/` ->
+  `~/.copilot/extensions/clipboard-tools/` on Linux, including WSL
 - WSL helper templates -> executables under `~/.local/bin`
 - `nix/templates/jj/config.toml.tmpl` -> rendered into
   `~/.config/jj/config.toml` by the bootstrap
+
+See [Copilot CLI extensions](copilot-extensions.md) for tools, runtime
+prerequisites, migration behavior, and local checks.
 
 ## JJ Template Rendering
 

@@ -11,6 +11,8 @@ Use these docs as the main reference:
   Home Manager and the bootstrap
 - [wsl-btrfs.md](wsl-btrfs.md): set up a separate Btrfs data VHDX for WSL,
   including fstab mounts and Windows sign-in automation
+- [copilot-extensions.md](copilot-extensions.md): tracked Azure DevOps and
+  Linux clipboard extensions, installation, and prerequisites
 - [tools/readme.md](tools/readme.md): installed tool reference pages
 
 ## Repo Layout

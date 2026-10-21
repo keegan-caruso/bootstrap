@@ -90,8 +90,9 @@ switch to a complete replacement generation.
 
 The bootstrap then activates the matching Home Manager configuration. Home
 Manager owns generated shell configuration, Starship, Ghostty, Copilot
-instructions, fonts, and user-level helper executables. Small managed loader
-blocks remain in `.zshrc` and WSL `.bashrc` so unrelated user content is
+instructions and [extensions](copilot-extensions.md), fonts, and user-level
+helper executables. Small managed loader blocks remain in `.zshrc` and WSL
+`.bashrc` so unrelated user content is
 preserved. Home Manager configures fontconfig on Linux and installs native
 font copies under `~/Library/Fonts/HomeManager` on macOS.
 Package installation remains owned by the dedicated bootstrap profile rather

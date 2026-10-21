@@ -75,6 +75,15 @@ home_files="$(readlink "${home_manager_generation}/home-files")"
   printf 'Home Manager must not manage the Copilot language-server configuration\n' >&2
   exit 1
 }
+copilot_extensions=(azure-devops)
+if [[ "$(uname -s)" == "Linux" ]]; then
+  copilot_extensions+=(clipboard-tools)
+fi
+for extension in "${copilot_extensions[@]}"; do
+  diff -r -- \
+    "${FLAKE_DIR}/templates/copilot/extensions/${extension}" \
+    "${home_files}/.copilot/extensions/${extension}"
+done
 if grep -Fq "nix profile install" "${home_manager_generation}/activate"; then
   printf 'Home Manager activation still uses deprecated nix profile install\n' >&2
   exit 1
@@ -85,6 +94,10 @@ fi
     printf 'Home Manager manual generation must remain disabled\n' >&2
     exit 1
   }
+
+printf 'Testing Copilot extensions\n'
+nix develop "path:${FLAKE_DIR}" --command node --test \
+  "${FLAKE_DIR}"/templates/copilot/extensions/*/*.test.mjs
 
 printf 'Testing .NET runtime discovery in development and generated home shells\n'
 env -u DOTNET_ROOT nix develop "path:${FLAKE_DIR}" --command bash -euc '
