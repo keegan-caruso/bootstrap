@@ -9,13 +9,16 @@ Use these docs as the main reference:
 - [scripts.md](scripts.md): purpose and usage of each top-level script
 - [templates.md](templates.md): tracked shell and config templates managed by
   Home Manager and the bootstrap
+- [wsl-btrfs.md](wsl-btrfs.md): set up a separate Btrfs data VHDX for WSL,
+  including fstab mounts and Windows sign-in automation
 - [tools/readme.md](tools/readme.md): installed tool reference pages
 
 ## Repo Layout
 
 - `bootstrap-nix.sh`: main bootstrap script
 - `configure-zellij.sh`: writes `~/.config/zellij/config.kdl`
-- `launch-wt-wsl.ps1`: launches Windows Terminal into WSL
+- `Mount-DataBtrfs.ps1`: attaches and mounts an existing Btrfs data VHDX
+- `Register-DataBtrfsStartup.ps1`: registers the elevated Windows sign-in task
 - `nix/home.nix`: declarative user configuration managed by Home Manager
 - `nix/templates/`: shell and app configuration sources
 
@@ -31,10 +34,4 @@ Configure Zellij:
 
 ```bash
 ./configure-zellij.sh
-```
-
-Launch WSL from Windows Terminal:
-
-```powershell
-.\launch-wt-wsl.ps1
 ```

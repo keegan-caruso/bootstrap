@@ -126,31 +126,42 @@ Run:
 ./test-nix.sh
 ```
 
-## `launch-wt-wsl.ps1`
+## `Mount-DataBtrfs.ps1`
 
-Launches Windows Terminal directly into WSL.
+Attaches an existing Btrfs data VHDX to WSL if needed and starts its
+UUID-based `/etc/fstab` mount through systemd in the distribution's mount
+namespace. Also starts dependent mount units, including repository bind
+mounts. It does not create or format the disk or change fstab.
 
-Parameters:
-
-- `-Distro`: optional WSL distro name
-- `-WorkingDirectory`: WSL path such as `~`, `/home/...`, or `/mnt/c/...`
-- `-Shell`: shell to exec inside WSL, default `zsh`
-- `-WtPath`: override path to `wt.exe`
-- `-NewWindow`: open a new Windows Terminal window
-
-Run from Windows PowerShell:
+Run from elevated Windows PowerShell:
 
 ```powershell
-.\launch-wt-wsl.ps1
+.\Mount-DataBtrfs.ps1
+.\Mount-DataBtrfs.ps1 -WhatIf
+.\Mount-DataBtrfs.ps1 -VhdPath "Q:\data-btrfs.vhdx" `
+    -Distribution Ubuntu-26.04 -MountPoint /mnt/data
 ```
 
-Examples:
+Defaults are `data-btrfs.vhdx` beside the script, `Ubuntu-26.04`, and
+`/mnt/data`. See [Btrfs data VHDX for WSL](wsl-btrfs.md) for prerequisites,
+disk creation, fstab setup, and restart behavior.
+
+## `Register-DataBtrfsStartup.ps1`
+
+Creates or updates the `Mount WSL Data Btrfs` scheduled task to run the
+adjacent `Mount-DataBtrfs.ps1` elevated, 30 seconds after Windows sign-in.
+Run once from elevated PowerShell 7 on Windows as the user owning the WSL
+distribution:
 
 ```powershell
-.\launch-wt-wsl.ps1 -Distro Ubuntu
-.\launch-wt-wsl.ps1 -Distro Ubuntu -WorkingDirectory /home/your-user/src
-.\launch-wt-wsl.ps1 -NewWindow
+.\Register-DataBtrfsStartup.ps1 -WhatIf
+.\Register-DataBtrfsStartup.ps1
 ```
+
+`-UserId` overrides the Windows user SID; by default it uses the current
+user. The task uses the mount script's defaults and does not run on later
+WSL restarts. See the [setup guide](wsl-btrfs.md#mount-automatically-at-windows-sign-in)
+before registering or customizing it.
 
 ## `nix-wt`
 

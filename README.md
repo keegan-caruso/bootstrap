@@ -18,6 +18,8 @@ This repo sets up:
   top-level scripts
 - [docs/templates.md](docs/templates.md):
   tracked template files
+- [docs/wsl-btrfs.md](docs/wsl-btrfs.md):
+  separate Btrfs data VHDX setup and automatic mounting for WSL
 - [docs/tools/readme.md](docs/tools/readme.md):
   installed tool reference pages
 
@@ -39,12 +41,6 @@ Configure the global Copilot CLI sandbox:
 
 ```bash
 ./configure-copilot-sandbox.sh
-```
-
-Launch WSL from Windows Terminal:
-
-```powershell
-.\launch-wt-wsl.ps1
 ```
 
 ## Notes
