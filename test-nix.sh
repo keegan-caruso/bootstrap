@@ -137,6 +137,18 @@ env -u FNM_MULTISHELL_PATH -u FNM_DIR \
   '
 
 if [[ "$(uname -s)" == "Linux" ]]; then
+  printf 'Testing bundled PowerShell script analysis\n'
+  env -u PSModulePath nix develop "path:${FLAKE_DIR}" --command \
+    pwsh -NoLogo -NoProfile -NonInteractive -Command '
+      $ErrorActionPreference = "Stop"
+      $env:PSModulePath = Join-Path $PSHOME "Modules"
+      Import-Module PSScriptAnalyzer
+      $diagnostics = @(Invoke-ScriptAnalyzer -ScriptDefinition "Write-Host test" -IncludeRule PSAvoidUsingWriteHost)
+      if ($diagnostics.Count -ne 1 -or $diagnostics[0].RuleName -ne "PSAvoidUsingWriteHost") {
+        throw "PSScriptAnalyzer did not report the expected diagnostic"
+      }
+    '
+
   printf 'Testing Linux sandbox runtime dependencies\n'
   nix develop "path:${FLAKE_DIR}" --command bash -euc '
     bwrap --version

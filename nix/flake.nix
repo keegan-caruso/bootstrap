@@ -154,6 +154,18 @@
             pkgs.azure-cli-extensions.azure-devops
             pkgs.azure-cli-extensions.log-analytics
           ];
+          psScriptAnalyzer = pkgs.fetchzip {
+            name = "PSScriptAnalyzer-1.25.0";
+            url = "https://github.com/PowerShell/PSScriptAnalyzer/releases/download/1.25.0/PSScriptAnalyzer.1.25.0.nupkg";
+            extension = "zip";
+            hash = "sha256-OEyOGPyFatNo68Jlx1G8UOKQu83UScZMRQ3TlzKxjl0=";
+            stripRoot = false;
+          };
+          powershellWithScriptAnalyzer = pkgs.powershell.overrideAttrs (old: {
+            postInstall = (old.postInstall or "") + ''
+              ln -s ${psScriptAnalyzer} "$out/share/powershell/Modules/PSScriptAnalyzer"
+            '';
+          });
           cliTools =
             with pkgs;
             [
@@ -214,7 +226,7 @@
               iptables
               playwrightRun
               (rootlessContainerTool "podman" podman)
-              powershell
+              powershellWithScriptAnalyzer
               slirp4netns
               util-linux
               wl-clipboard
