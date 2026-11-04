@@ -161,9 +161,17 @@
             hash = "sha256-OEyOGPyFatNo68Jlx1G8UOKQu83UScZMRQ3TlzKxjl0=";
             stripRoot = false;
           };
-          powershellWithScriptAnalyzer = pkgs.powershell.overrideAttrs (old: {
+          pester = pkgs.fetchzip {
+            name = "Pester-5.9.1";
+            url = "https://www.powershellgallery.com/api/v2/package/Pester/5.9.1";
+            extension = "zip";
+            hash = "sha256-WO+Y2l1xI+Mb/1qJoTQLksy/sKbHmp/8iTwmH7X7M8E=";
+            stripRoot = false;
+          };
+          powershellWithModules = pkgs.powershell.overrideAttrs (old: {
             postInstall = (old.postInstall or "") + ''
               ln -s ${psScriptAnalyzer} "$out/share/powershell/Modules/PSScriptAnalyzer"
+              ln -s ${pester} "$out/share/powershell/Modules/Pester"
             '';
           });
           cliTools =
@@ -226,7 +234,7 @@
               iptables
               playwrightRun
               (rootlessContainerTool "podman" podman)
-              powershellWithScriptAnalyzer
+              powershellWithModules
               slirp4netns
               util-linux
               wl-clipboard

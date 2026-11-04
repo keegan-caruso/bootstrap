@@ -137,7 +137,7 @@ env -u FNM_MULTISHELL_PATH -u FNM_DIR \
   '
 
 if [[ "$(uname -s)" == "Linux" ]]; then
-  printf 'Testing bundled PowerShell script analysis\n'
+  printf 'Testing bundled PowerShell modules\n'
   env -u PSModulePath nix develop "path:${FLAKE_DIR}" --command \
     pwsh -NoLogo -NoProfile -NonInteractive -Command '
       $ErrorActionPreference = "Stop"
@@ -146,6 +146,18 @@ if [[ "$(uname -s)" == "Linux" ]]; then
       $diagnostics = @(Invoke-ScriptAnalyzer -ScriptDefinition "Write-Host test" -IncludeRule PSAvoidUsingWriteHost)
       if ($diagnostics.Count -ne 1 -or $diagnostics[0].RuleName -ne "PSAvoidUsingWriteHost") {
         throw "PSScriptAnalyzer did not report the expected diagnostic"
+      }
+      Import-Module Pester -MinimumVersion 5.0
+      $container = New-PesterContainer -ScriptBlock {
+        Describe "Bundled Pester" {
+          It "runs assertions" {
+            1 + 1 | Should -Be 2
+          }
+        }
+      }
+      $result = Invoke-Pester -Container $container -PassThru -Output None
+      if ($result.Result -ne "Passed" -or $result.PassedCount -ne 1) {
+        throw "Pester did not run the expected test"
       }
     '
 
