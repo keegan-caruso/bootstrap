@@ -80,7 +80,7 @@ To update these paths without enabling a disabled sandbox:
 ```
 
 The bootstrap installs Nix with the pinned Determinate Systems installer
-`v3.23.2` when needed. It downloads the immutable release script and verifies
+`v3.24.1` when needed. It downloads the immutable release script and verifies
 its published SHA-256 digest before execution, then installs the appropriate
 flake output into a dedicated profile at
 `${XDG_STATE_HOME:-~/.local/state}/nix/profiles/bootstrap`.

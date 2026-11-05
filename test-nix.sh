@@ -133,6 +133,7 @@ env -u FNM_MULTISHELL_PATH -u FNM_DIR \
     test "$(readlink -f "$(command -v ilspy)")" = "$(readlink -f "$(command -v ilspycmd)")"
     ilspy --version
     ilspycmd --version
+    az version --output json
     terraform version
   '
 

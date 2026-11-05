@@ -12,10 +12,10 @@ PROFILE_PATH="${STATE_HOME}/nix/profiles/bootstrap"
 HOME_MANAGER_USER="keegancaruso"
 SUBUID_FILE="${SUBUID_FILE:-/etc/subuid}"
 SUBGID_FILE="${SUBGID_FILE:-/etc/subgid}"
-NIX_INSTALLER_VERSION="v3.23.2"
-NIX_INSTALLER_SHA256="7dad70f7ea368a3cad732ea40ae4e67909394c87ee4d218ab29368f4796d2486"
+NIX_INSTALLER_VERSION="v3.24.1"
+NIX_INSTALLER_SHA256="1470fa510a9e3e8d8e03c7dc50f89c22003a0d7077a43486b6a3e97e3dde6160"
 NIX_INSTALLER_URL="https://github.com/DeterminateSystems/nix-installer/releases/download/${NIX_INSTALLER_VERSION}/nix-installer.sh"
-AZUREAUTH_VERSION="0.9.6"
+AZUREAUTH_VERSION="0.9.7"
 # shellcheck source=packages.sh
 # shellcheck disable=SC1091
 source "${SCRIPT_DIR}/packages.sh"
@@ -314,11 +314,11 @@ install_azureauth() {
   case "$(uname -m)" in
     x86_64)
       arch="x64"
-      checksum="3943ffeba55b380c087d8f92a3221caf8b1c02c198558d472613248169639b45"
+      checksum="27177c704fdca2cf012dccf1b5484cd04e18294cdf65510aef0ce36a6154dedc"
       ;;
     aarch64)
       arch="arm64"
-      checksum="e19df4a0bb59bbe4deb7a4e45aed50ff229b78d5248501fc73d9b626335338e8"
+      checksum="e9f50de3b39b55d6aadf58ddcdbf9e63a42e70f4579dbea677ac7adf96e051bd"
       ;;
     *)
       fail "Unsupported AzureAuth architecture: $(uname -m)"

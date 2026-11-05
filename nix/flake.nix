@@ -140,19 +140,48 @@
               ln -s dotnet-csi "$out/bin/csi"
             '';
           };
-          ilspycmd = pkgs.buildDotnetGlobalTool {
+          ilspycmd = pkgs.buildDotnetGlobalTool rec {
             pname = "ilspycmd";
-            version = "11.1.0.9782";
-            nugetHash = "sha256-dMB/rK8YUMeKd5/FCQMfdW4cDeJLGlNvM2PX74HOAB8=";
+            version = "11.2.0.10050";
+            nugetHash = "sha256-MZYWV2jlqBj46PEB+ZmqnNKAio+VaK4cSZi7vMaKWVM=";
+            nugetDeps = [
+              (pkgs.dotnetCorePackages.fetchNupkg {
+                pname = if system == "x86_64-linux" then "ilspycmd.linux-x64" else "ilspycmd.any";
+                inherit version;
+                hash =
+                  if system == "x86_64-linux" then
+                    "sha256-W+OvhoOekwddED5bT+xzpje41w5JyX6vBD6+VbfHgA0="
+                  else
+                    "sha256-1AFfHGOqIhHBxpIyHswo88JBrlhtRB9QxaxQODrQA4g=";
+                installable = true;
+              })
+            ];
             dotnet-sdk = dotnetSdk;
             dotnet-runtime = dotnetSdk;
             postFixup = ''
               ln -s ilspycmd "$out/bin/ilspy"
             '';
           };
-          azureCli = pkgs.azure-cli.withExtensions [
-            pkgs.azure-cli-extensions.azure-devops
-            pkgs.azure-cli-extensions.log-analytics
+          azureCliPkgs = pkgs.extend (
+            _final: prev: {
+              pythonPackagesExtensions = prev.pythonPackagesExtensions ++ [
+                (_pyFinal: pyPrev: {
+                  # Fabric requires Invoke < 3: https://github.com/NixOS/nixpkgs/pull/576742
+                  invoke = pyPrev.invoke.overridePythonAttrs (_old: rec {
+                    version = "2.2.1";
+                    src = pkgs.fetchPypi {
+                      pname = "invoke";
+                      inherit version;
+                      hash = "sha256-UVv0m0pIkyt5sCRZA0jaIvOcSULf+ZGtH7i4uuob5wc=";
+                    };
+                  });
+                })
+              ];
+            }
+          );
+          azureCli = azureCliPkgs.azure-cli.withExtensions [
+            azureCliPkgs.azure-cli-extensions.azure-devops
+            azureCliPkgs.azure-cli-extensions.log-analytics
           ];
           psScriptAnalyzer = pkgs.fetchzip {
             name = "PSScriptAnalyzer-1.25.0";

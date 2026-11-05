@@ -626,7 +626,7 @@ test_wsl_git_uses_windows_gcm() (
 
 test_azureauth_install() (
   local command_log="${TEST_ROOT}/azureauth.log"
-  local mock_checksum="3943ffeba55b380c087d8f92a3221caf8b1c02c198558d472613248169639b45"
+  local mock_checksum="27177c704fdca2cf012dccf1b5484cd04e18294cdf65510aef0ce36a6154dedc"
   local binary="${HOME}/.local/share/azureauth/${AZUREAUTH_VERSION}/azureauth"
   IS_WSL=1
 
@@ -656,10 +656,10 @@ test_azureauth_install() (
   [[ ! -e "$binary" ]] || fail_test "Invalid AzureAuth package was installed"
   assert_not_contains "dpkg-deb -x" "$command_log"
 
-  mock_checksum="3943ffeba55b380c087d8f92a3221caf8b1c02c198558d472613248169639b45"
+  mock_checksum="27177c704fdca2cf012dccf1b5484cd04e18294cdf65510aef0ce36a6154dedc"
   : >"$command_log"
   install_azureauth
-  assert_contains "azureauth-0.9.6-linux-x64.deb" "$command_log"
+  assert_contains "azureauth-0.9.7-linux-x64.deb" "$command_log"
   assert_contains "dpkg-deb -x" "$command_log"
   assert_equals "$binary" "$(readlink "${HOME}/.local/bin/azureauth")"
 
