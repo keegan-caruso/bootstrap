@@ -76,7 +76,6 @@ detect_os() {
           ;;
       esac
       if is_wsl; then
-        [[ "$OS" == "ubuntu" ]] || fail "WSL bootstrap supports Ubuntu only."
         IS_WSL=1
       fi
       ;;
@@ -89,7 +88,9 @@ detect_os() {
 require_sudo() {
   [[ "$OS" == "ubuntu" || "$OS" == "fedora" ]] || return 0
   command_exists sudo || fail "sudo is required on Linux."
-  sudo -v
+  if ! sudo -n true 2>/dev/null; then
+    sudo -v
+  fi
 }
 
 ensure_wsl_interop() {
@@ -280,15 +281,23 @@ install_host_prereqs() {
         xz-utils
       ;;
     fedora)
+      local wsl_packages=()
+      if [[ "$IS_WSL" -eq 1 ]]; then
+        wsl_packages=(dpkg libicu)
+      fi
       log "Installing Fedora integration prerequisites"
       sudo dnf install -y \
         ca-certificates \
+        containers-common \
         /usr/bin/curl \
         gnome-keyring \
+        libatomic \
         libsecret \
         policycoreutils \
+        selinux-policy-targeted \
         util-linux \
-        xz
+        xz \
+        "${wsl_packages[@]}"
       ;;
   esac
 }
@@ -585,6 +594,9 @@ remove_wsl_credential_helper() {
 configure_git() {
   local key
   local managed_config="${HOME}/.config/git/bootstrap.config"
+  local windows_gcm="${BOOTSTRAP_WINDOWS_GCM_PATH:-}"
+  local candidate
+  local credential_helper
 
   log "Configuring global Git settings"
   git config --global user.name "$GIT_NAME"
@@ -609,11 +621,24 @@ configure_git() {
   if [[ "$IS_WSL" -eq 1 ]]; then
     git config --global core.fileMode false
     git config --global core.autocrlf input
-    command_exists "/mnt/c/Program Files/Git/mingw64/bin/git-credential-manager.exe" \
-      || fail "Windows Git Credential Manager is required. Install Git for Windows first."
+    if [[ -z "$windows_gcm" ]]; then
+      for candidate in \
+        "/mnt/c/Program Files/Git/mingw64/bin/git-credential-manager.exe" \
+        "/mnt/c/Program Files/Git/ucrt64/bin/git-credential-manager.exe"
+      do
+        if command_exists "$candidate"; then
+          windows_gcm="$candidate"
+          break
+        fi
+      done
+    fi
+    if [[ "$windows_gcm" != /* ]] || ! command_exists "$windows_gcm"; then
+      fail "Windows Git Credential Manager is required. Install Git for Windows or set BOOTSTRAP_WINDOWS_GCM_PATH to its absolute WSL executable path."
+    fi
     remove_wsl_credential_helper
+    printf -v credential_helper '%q' "$windows_gcm"
     git config --global --replace-all credential.helper \
-      '/mnt/c/Program\ Files/Git/mingw64/bin/git-credential-manager.exe'
+      "$credential_helper"
     git config --global credential.https://dev.azure.com.useHttpPath true
   fi
 }

@@ -157,15 +157,15 @@ assert_contains "Fedora Atomic desktops are not supported" "$output"
 is_wsl() {
   return 0
 }
-if output="$(detect_os 2>&1)"; then
-  fail_test "Unexpectedly accepted Fedora on WSL"
-fi
-assert_contains "WSL bootstrap supports Ubuntu only" "$output"
+detect_os
+[[ "$OS" == "fedora" && "$IS_WSL" -eq 1 ]] \
+  || fail_test "Fedora on WSL was not detected"
 
 # shellcheck disable=SC2329
 is_wsl() {
   return 1
 }
+IS_WSL=0
 detect_os
 [[ "$OS" == "fedora" ]] || fail_test "The Fedora container was not detected"
 
@@ -181,9 +181,12 @@ rm -f "$dnf_log"
 test -x /usr/bin/curl
 for package in \
   ca-certificates \
+  containers-common \
   gnome-keyring \
+  libatomic \
   libsecret \
   policycoreutils \
+  selinux-policy-targeted \
   util-linux \
   xz
 do

@@ -25,7 +25,7 @@ assert_contains() {
   local expected="$1"
   local file="$2"
 
-  grep -Fq "$expected" "$file" \
+  grep -Fq -- "$expected" "$file" \
     || fail_test "Expected ${file} to contain: ${expected}"
 }
 
@@ -33,7 +33,7 @@ assert_not_contains() {
   local unexpected="$1"
   local file="$2"
 
-  if grep -Fq "$unexpected" "$file"; then
+  if grep -Fq -- "$unexpected" "$file"; then
     fail_test "Expected ${file} not to contain: ${unexpected}"
   fi
 }
@@ -97,10 +97,9 @@ test_os_detection() (
 
   wsl_state=1
   printf 'ID=fedora\nVERSION_ID=45\n' >"$os_release"
-  if (OS_RELEASE_FILE="$os_release" detect_os) >"$error_log" 2>&1; then
-    fail_test "Unexpectedly accepted Fedora on WSL"
-  fi
-  assert_contains "WSL bootstrap supports Ubuntu only" "$error_log"
+  OS_RELEASE_FILE="$os_release" detect_os
+  assert_equals fedora "$OS"
+  assert_equals 1 "$IS_WSL"
 
   printf 'ID=debian\nVERSION_ID=13\n' >"$os_release"
   if (OS_RELEASE_FILE="$os_release" detect_os) >"$error_log" 2>&1; then
@@ -123,6 +122,56 @@ test_ubuntu_host_prereqs() (
   assert_contains "apt-get install -y" "$command_log"
   assert_contains '?name(^libicu[0-9]+$)' "$command_log"
   assert_not_contains "libicu78" "$command_log"
+)
+
+test_fedora_host_prereqs() (
+  local command_log="${TEST_ROOT}/fedora-prereqs.log"
+
+  sudo() {
+    [[ "$1" == "dnf" ]] || fail_test "Unexpected prerequisite command: $*"
+    printf '%s\n' "$*" >>"$command_log"
+  }
+
+  OS=fedora
+  IS_WSL=0
+  install_host_prereqs
+  assert_contains "dnf install -y" "$command_log"
+  assert_contains "containers-common" "$command_log"
+  assert_contains "libatomic" "$command_log"
+  assert_contains "/usr/bin/curl" "$command_log"
+  assert_contains "policycoreutils" "$command_log"
+  assert_contains "selinux-policy-targeted" "$command_log"
+  assert_not_contains "dpkg" "$command_log"
+  assert_not_contains "libicu" "$command_log"
+
+  : >"$command_log"
+  IS_WSL=1
+  install_host_prereqs
+  assert_contains "dpkg libicu" "$command_log"
+)
+
+test_passwordless_sudo() (
+  local command_log="${TEST_ROOT}/sudo.log"
+  local passwordless=1
+
+  sudo() {
+    printf '%s\n' "$*" >>"$command_log"
+    if [[ "$*" == "-n true" ]]; then
+      [[ "$passwordless" -eq 1 ]]
+    else
+      assert_equals "-v" "$*"
+    fi
+  }
+
+  OS=fedora
+  require_sudo
+  assert_contains "-n true" "$command_log"
+  assert_not_contains "-v" "$command_log"
+
+  : >"$command_log"
+  passwordless=0
+  require_sudo
+  assert_contains "-v" "$command_log"
 )
 
 test_dev_sysctls_preserve_memory_map_limit() (
@@ -589,12 +638,13 @@ test_git_managed_include() {
 test_wsl_git_uses_windows_gcm() (
   local managed_config="${HOME}/.config/git/bootstrap.config"
   local gcm_available=0
+  local available_gcm="/mnt/c/Program Files/Git/mingw64/bin/git-credential-manager.exe"
   local expected_helper='/mnt/c/Program\ Files/Git/mingw64/bin/git-credential-manager.exe'
   mkdir -p "$(dirname "$managed_config")"
   printf '[core]\n  pager = delta\n' >"$managed_config"
 
   command_exists() {
-    [[ "$1" == "/mnt/c/Program Files/Git/mingw64/bin/git-credential-manager.exe" \
+    [[ "$1" == "$available_gcm" \
       && "$gcm_available" == 1 ]]
   }
 
@@ -622,6 +672,23 @@ test_wsl_git_uses_windows_gcm() (
     "$(git config --global credential.https://github.com.helper)"
   assert_equals "custom-ado" \
     "$(git config --global --get-all credential.https://dev.azure.com.helper)"
+
+  available_gcm="/mnt/c/Program Files/Git/ucrt64/bin/git-credential-manager.exe"
+  configure_git
+  assert_equals '/mnt/c/Program\ Files/Git/ucrt64/bin/git-credential-manager.exe' \
+    "$(git config --global --get-all credential.helper)"
+
+  BOOTSTRAP_WINDOWS_GCM_PATH="/mnt/c/Users/test/Custom Git/git-credential-manager.exe"
+  available_gcm="$BOOTSTRAP_WINDOWS_GCM_PATH"
+  configure_git
+  assert_equals '/mnt/c/Users/test/Custom\ Git/git-credential-manager.exe' \
+    "$(git config --global --get-all credential.helper)"
+
+  BOOTSTRAP_WINDOWS_GCM_PATH="relative/git-credential-manager.exe"
+  if (configure_git) >"${TEST_ROOT}/relative-gcm.log" 2>&1; then
+    fail_test "WSL Git configuration accepted a relative GCM executable path"
+  fi
+  assert_contains "absolute WSL executable path" "${TEST_ROOT}/relative-gcm.log"
 )
 
 test_azureauth_install() (
@@ -834,6 +901,8 @@ if [[ "${1:-}" == "--os-detection-only" || "${1:-}" == "--host-only" ]]; then
   test_os_detection
   if [[ "$1" == "--host-only" ]]; then
     test_ubuntu_host_prereqs
+    test_fedora_host_prereqs
+    test_passwordless_sudo
     test_dev_sysctls_preserve_memory_map_limit
     printf 'Isolated host checks passed\n'
   else
@@ -844,6 +913,8 @@ fi
 
 test_os_detection
 test_ubuntu_host_prereqs
+test_fedora_host_prereqs
+test_passwordless_sudo
 test_dev_sysctls_preserve_memory_map_limit
 test_managed_config_is_idempotent
 test_home_manager_migration_safety

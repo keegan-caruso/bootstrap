@@ -98,11 +98,11 @@ credentials.
 ## Supported platforms
 
 - Ubuntu, including WSL, without a release-version gate
-- Fedora 45 on a mutable installation, such as Workstation
+- Fedora 45 on a mutable installation, such as Workstation, or WSL
 - Apple Silicon macOS
 
 The pinned nixpkgs revision no longer supports Intel macOS.
-Fedora Atomic desktops and Fedora on WSL are not supported.
+Fedora Atomic desktops are not supported.
 
 Accepting an Ubuntu release does not validate its package availability or
 complete provisioning. Host-detection regression tests cover Ubuntu 24.04,
@@ -119,18 +119,26 @@ when needed, and enables unprivileged user namespaces when the host has them
 disabled.
 
 Fedora uses dnf for equivalent host prerequisites, including
-`util-linux` and `policycoreutils`. The curl executable is requested by path so
+`util-linux`, `policycoreutils`, and the targeted SELinux base policy needed
+by the Nix installer's policy module, including on minimal WSL images.
+The curl executable is requested by path so
 either Fedora's full or minimal curl package can satisfy it.
+On Fedora WSL, it also installs `dpkg` to extract the verified AzureAuth
+package without installing it into the host package database, and `libicu`
+for its .NET runtime.
+Fedora's `containers-common` supplies the host registry configuration and image
+trust policy used by the Nix-provided container tools.
+The host `libatomic` runtime is needed by Node.js installed through `fnm`.
 
 When Nix is absent, the bootstrap downloads the pinned Determinate Nix
 installer release and verifies its published SHA-256 digest before running it.
 On Fedora, the installer provisions its SELinux policy using the host tools;
 the bootstrap does not disable SELinux.
 
-Fedora support covers host bootstrap and default-shell setup. Ghostty graphics,
-Copilot sandboxing, Playwright, and overlay sessions have not been validated on
-Fedora and are unchanged. The existing native Linux profile still includes
-Ghostty.
+Fedora support covers host bootstrap, WSL integration, and default-shell setup.
+Ghostty graphics, Copilot sandboxing, Playwright, and overlay sessions have not
+been validated on Fedora and are unchanged. The existing native Linux profile
+still includes Ghostty.
 
 To select the installed Zsh as the default shell on Ubuntu or Fedora:
 
@@ -166,8 +174,9 @@ Home Manager owns:
 Global Git configuration includes identity, Delta, `zdiff3`, fetch pruning,
 and a default `main` branch. WSL configures native Linux Git to use Windows Git
 Credential Manager directly for clone, fetch, and push. Install Git for Windows
-before running bootstrap; the expected executable is
-`/mnt/c/Program Files/Git/mingw64/bin/git-credential-manager.exe`.
+before running bootstrap; it detects
+`/mnt/c/Program Files/Git/mingw64/bin/git-credential-manager.exe`
+or the newer `ucrt64/bin/git-credential-manager.exe` layout in the same installation.
 The bootstrap applies these settings and removes legacy `manager-wsl` entries:
 
 ```bash
@@ -178,6 +187,12 @@ git config --global credential.https://dev.azure.com.useHttpPath true
 The global credential helper is replaced, while other host-specific helper
 settings remain intact. Azure DevOps credentials are matched by repository
 path. No per-command authorization-header prefix or custom wrapper is needed.
+For another Windows Git installation location, set its absolute WSL executable
+path when running bootstrap:
+
+```bash
+BOOTSTRAP_WINDOWS_GCM_PATH='/mnt/c/path/to/git-credential-manager.exe' ./bootstrap-nix.sh
+```
 
 WSL also installs the verified Linux AzureAuth release under
 `~/.local/share/azureauth`, with a link at `~/.local/bin/azureauth`, for tools that
