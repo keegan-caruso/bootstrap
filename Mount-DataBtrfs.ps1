@@ -2,13 +2,14 @@
 .SYNOPSIS
 Attaches the data Btrfs VHD to WSL and starts its fstab mount and dependent mounts.
 .EXAMPLE
-.\Mount-DataBtrfs.ps1
-Run from an elevated PowerShell. Defaults to data-btrfs.vhdx beside this script,
-Ubuntu-26.04, and /mnt/data. No disks are formatted and fstab is not changed.
-Mounts are managed by Ubuntu's systemd in its mount namespace. Dependent
+.\Mount-DataBtrfs.ps1 -Distribution MyDistro
+Run from an elevated PowerShell. Defaults to data-btrfs.vhdx beside this script
+and /mnt/data. The distribution must be selected explicitly.
+No disks are formatted and fstab is not changed.
+Mounts are managed by the distribution's systemd in its mount namespace. Dependent
 repository bind mounts are retried even when the data filesystem is already mounted.
 .EXAMPLE
-.\Mount-DataBtrfs.ps1 -WhatIf
+.\Mount-DataBtrfs.ps1 -Distribution MyDistro -WhatIf
 Shows the intended operation without attaching or mounting anything.
 .NOTES
 To mount automatically at Windows sign-in, run Register-DataBtrfsStartup.ps1
@@ -18,7 +19,9 @@ The scheduled task runs at Windows sign-in, not on subsequent WSL restarts.
 [CmdletBinding(SupportsShouldProcess)]
 param(
     [string] $VhdPath = (Join-Path $PSScriptRoot 'data-btrfs.vhdx'),
-    [string] $Distribution = 'Ubuntu-26.04',
+    [Parameter(Mandatory)]
+    [ValidateNotNullOrEmpty()]
+    [string] $Distribution,
     [ValidatePattern('^/')]
     [string] $MountPoint = '/mnt/data'
 )
@@ -57,9 +60,61 @@ case "$source" in
     UUID=?*) uuid=${source#UUID=} ;;
     *) fail "The fstab entry for $target must identify the filesystem by UUID." ;;
 esac
+fstab_options=$(findmnt --fstab --mountpoint "$target" --noheadings --raw --output OPTIONS)
 
-if actual=$(findmnt --mountpoint "$target" --noheadings --output UUID); then
+mount_option() {
+    remaining=$1
+    key=$2
+    value=''
+    while [ -n "$remaining" ]; do
+        option=${remaining%%,*}
+        case "$remaining" in
+            *,*) remaining=${remaining#*,} ;;
+            *) remaining='' ;;
+        esac
+        case "$option" in
+            "$key"=*) value=${option#*=} ;;
+        esac
+    done
+    printf '%s\n' "$value"
+}
+
+verify_mount() {
+    actual=$(findmnt --mountpoint "$target" --noheadings --output UUID) || return 1
     [ "$actual" = "$uuid" ] || fail "A different filesystem is already mounted at $target."
+    actual_type=$(findmnt --mountpoint "$target" --noheadings --output FSTYPE) ||
+        fail "Cannot read the mounted filesystem type for $target."
+    [ "$actual_type" = btrfs ] || fail "The mounted filesystem at $target is not Btrfs."
+    actual_options=$(findmnt --mountpoint "$target" --noheadings --raw --output OPTIONS) ||
+        fail "Cannot read the mounted filesystem options for $target."
+    actual_id=$(mount_option "$actual_options" subvolid)
+    expected_id=$(mount_option "$fstab_options" subvolid)
+    expected_path=$(mount_option "$fstab_options" subvol)
+
+    if [ -n "$expected_path" ]; then
+        expected_path="/${expected_path#/}"
+        while [ "$expected_path" != / ] && [ "${expected_path%/}" != "$expected_path" ]; do
+            expected_path=${expected_path%/}
+        done
+        actual_path=$(findmnt --mountpoint "$target" --noheadings --raw --output FSROOT) ||
+            fail "Cannot read the mounted Btrfs subvolume path for $target."
+        [ "$actual_path" = "$expected_path" ] ||
+            fail "The Btrfs subvolume mounted at $target does not match fstab subvol=$expected_path."
+    fi
+    if [ "$expected_id" = 0 ] || { [ -z "$expected_id" ] && [ -z "$expected_path" ]; }; then
+        default_subvolume=$(btrfs subvolume get-default "$target") ||
+            fail "Cannot read the default Btrfs subvolume for $target."
+        expected_id=$(printf '%s\n' "$default_subvolume" | awk '$1 == "ID" { print $2; exit }')
+        [ -n "$expected_id" ] || fail "Cannot identify the default Btrfs subvolume for $target."
+    fi
+    if [ -n "$expected_id" ]; then
+        [ "$actual_id" = "$expected_id" ] ||
+            fail "The Btrfs subvolume mounted at $target does not match fstab subvolid=$expected_id."
+    fi
+    return 0
+}
+
+if verify_mount; then
     if [ "$mode" = check ]; then
         printf '%s\n' mounted
         exit 0
@@ -96,9 +151,8 @@ fi
 modprobe btrfs
 unit=$(systemd-escape --path --suffix=mount -- "$target")
 systemctl start "$unit"
-actual=$(findmnt --mountpoint "$target" --noheadings --output UUID) ||
+verify_mount ||
     fail "Mount verification failed for $target."
-[ "$actual" = "$uuid" ] || fail "Mounted filesystem UUID does not match $uuid."
 
 # These fstab mounts may have failed before the VHD was attached.
 dependents=$(systemctl show --property=RequiredBy --value "$unit")

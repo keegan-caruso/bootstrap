@@ -18,11 +18,23 @@ Substitute your drive, distribution, and mount point consistently.
 - A Windows volume with space for the growing VHDX. The volume must be
   available before the mount script runs, including at sign-in.
 
-Inside Ubuntu, install the filesystem and mount utilities:
+Inside the selected distribution, install the filesystem and mount utilities.
+On Ubuntu:
 
 ```bash
 sudo apt-get update
 sudo apt-get install btrfs-progs util-linux kmod
+```
+
+On Fedora:
+
+```bash
+sudo dnf install btrfs-progs util-linux kmod
+```
+
+Then verify kernel support and systemd:
+
+```bash
 sudo modprobe btrfs
 grep -w btrfs /proc/filesystems
 ps -p 1 -o comm=
@@ -37,9 +49,9 @@ systemd=true
 ```
 
 Then save work in all distributions, run `wsl.exe --shutdown` from Windows,
-and reopen Ubuntu. If loading Btrfs fails, stop here: `btrfs-progs` alone
-does not add kernel support. Use a WSL kernel and matching modules with
-Btrfs support before continuing.
+and reopen the selected distribution. If loading Btrfs fails, stop here:
+`btrfs-progs` alone does not add kernel support. Use a WSL kernel and matching
+modules with Btrfs support before continuing.
 
 ## Put the scripts beside the VHDX
 
@@ -50,7 +62,8 @@ the Windows directory that will hold the disk:
 Copy-Item .\Mount-DataBtrfs.ps1, .\Register-DataBtrfsStartup.ps1 Q:\
 ```
 
-`Mount-DataBtrfs.ps1` defaults to `data-btrfs.vhdx` beside itself. It attaches
+`Mount-DataBtrfs.ps1` defaults to `data-btrfs.vhdx` beside itself and
+`/mnt/data`; `-Distribution` is required. It attaches
 the disk only when needed, then starts the distribution's systemd mount unit
 from `/etc/fstab`. It does not create or format disks, edit fstab, or change
 ownership.
@@ -75,7 +88,7 @@ exit
 ```
 
 Do not initialize or format this disk in Windows. Before attaching it, run
-this inside Ubuntu and note the existing devices:
+this inside the selected distribution and note the existing devices:
 
 ```bash
 lsblk -o NAME,SIZE,TYPE,FSTYPE,LABEL,UUID,MOUNTPOINTS
@@ -88,9 +101,9 @@ as ext4:
 wsl.exe --mount --vhd "Q:\data-btrfs.vhdx" --bare
 ```
 
-Inside Ubuntu, run `lsblk` again. Identify the newly added, empty 256 GiB
-disk by comparing the two listings. Device names can change after every
-attachment; never assume the disk is `/dev/sdb`.
+Inside the selected distribution, run `lsblk` again. Identify the newly added,
+empty 256 GiB disk by comparing the two listings. Device names can change after
+every attachment; never assume the disk is `/dev/sdb`.
 
 **The next command creates a filesystem and can destroy data on the selected
 device.** Replace `/dev/sdX` only after verifying it is the new empty data
@@ -106,7 +119,7 @@ unexpected signature instead.
 
 ## Configure the fstab mount
 
-Inside Ubuntu, get the UUID of the Btrfs filesystem on the identified device
+Inside the selected distribution, get the Btrfs UUID on the identified device
 (use the partition device instead if your existing disk is partitioned):
 
 ```bash
@@ -117,16 +130,23 @@ sudoedit /etc/fstab
 
 Add one entry, replacing `<UUID>` with the actual filesystem UUID:
 
+<!-- markdownlint-disable MD013 -- fstab entries must stay on one line. -->
 ```fstab
-UUID=<UUID> /mnt/data btrfs compress=zstd,nofail,x-systemd.device-timeout=5s 0 0
+UUID=<UUID> /mnt/data btrfs subvolid=5,compress=zstd,nofail,x-systemd.device-timeout=5s 0 0
 ```
+<!-- markdownlint-enable MD013 -->
 
 The mount script requires a `UUID=` source and a `btrfs` filesystem type.
 Do not use a transient `/dev/sdX` name or the VHDX's Windows path. `nofail`
-allows Ubuntu to boot without the data disk; the device timeout limits the
-wait when it is absent. Compression applies to newly written data.
+allows the distribution to boot without the data disk; the device timeout limits
+the wait when it is absent. Compression applies to newly written data.
+This example explicitly selects the top-level subvolume, ID 5. For an existing
+filesystem, select the intended `subvolid=` or `subvol=` instead. The script
+checks the mounted subvolume as well as the UUID before starting repository
+bind mounts. If neither option is specified, it checks the filesystem's default
+subvolume. A mismatched existing mount is rejected, not silently remounted.
 
-Reload the generated systemd mount units inside Ubuntu:
+Reload the generated systemd mount units inside the selected distribution:
 
 ```bash
 sudo systemctl daemon-reload
@@ -135,12 +155,12 @@ sudo systemctl daemon-reload
 From elevated Windows PowerShell, mount and verify:
 
 ```powershell
-Q:\Mount-DataBtrfs.ps1 -WhatIf
-Q:\Mount-DataBtrfs.ps1
+Q:\Mount-DataBtrfs.ps1 -Distribution Ubuntu-26.04 -WhatIf
+Q:\Mount-DataBtrfs.ps1 -Distribution Ubuntu-26.04
 ```
 
 `-WhatIf` still requires an existing VHDX file, but does not attach it or run
-the Linux mount checks. The real run checks the fstab entry and mounted UUID,
+the Linux mount checks. The real run checks the fstab entry, mounted UUID, and subvolume,
 waits up to 30 seconds for an attached filesystem to appear, and prints the
 resulting mount. Rerunning is safe when that filesystem is already mounted.
 
@@ -148,8 +168,8 @@ The script enters PID 1's mount namespace with `nsenter` and asks systemd
 to start the mount, so the filesystem is not mounted only in a transient
 `wsl.exe` session.
 
-In Ubuntu, confirm the filesystem is mounted before creating a writable
-directory for your user:
+In the selected distribution, confirm the filesystem is mounted before creating
+a writable directory for your user:
 
 ```bash
 findmnt --mountpoint /mnt/data -o TARGET,SOURCE,FSTYPE,UUID,OPTIONS
@@ -196,8 +216,10 @@ After a successful manual mount, run once from **elevated PowerShell 7 on
 Windows**, as the same Windows user:
 
 ```powershell
-Q:\Register-DataBtrfsStartup.ps1 -WhatIf
-Q:\Register-DataBtrfsStartup.ps1
+Q:\Register-DataBtrfsStartup.ps1 -Distribution Ubuntu-26.04 `
+    -VhdPath "Q:\data-btrfs.vhdx" -MountPoint /mnt/data -WhatIf
+Q:\Register-DataBtrfsStartup.ps1 -Distribution Ubuntu-26.04 `
+    -VhdPath "Q:\data-btrfs.vhdx" -MountPoint /mnt/data
 ```
 
 This creates or updates the `Mount WSL Data Btrfs` scheduled task. It runs
@@ -206,12 +228,12 @@ with highest privileges in the user's interactive session, 30 seconds
 after sign-in. It allows battery operation and retries failures up to
 three times at one-minute intervals.
 
-The task passes no parameters to the mount script. For automatic mounting
-with non-default settings, edit the parameter defaults in the deployed
-`Mount-DataBtrfs.ps1` before registering it. Keep both scripts and the
-PowerShell installation at their registered paths; rerun registration if
-those paths change. Avoid overwriting customized defaults when refreshing
-the deployed copy.
+The task preserves the selected `-VhdPath`, `-Distribution`, and `-MountPoint`
+arguments; neither script needs machine-specific edits. Arguments are encoded
+in the PowerShell action so spaces and quotes are preserved. For example,
+select `-Distribution FedoraLinux-45` for a Fedora WSL installation.
+Keep both scripts and the PowerShell installation at their registered paths.
+Rerun registration to change the saved arguments or update moved script paths.
 
 Inspect or manually run the task from elevated Windows PowerShell:
 
@@ -223,7 +245,7 @@ Start-ScheduledTask -TaskName 'Mount WSL Data Btrfs'
 The trigger is **Windows sign-in, not WSL startup**. After `wsl.exe --shutdown`,
 a distribution termination, or a manual detach, rerun the mount script
 when the disk needs mounting again. Do not expect the task to rerun just
-because Ubuntu was reopened.
+because the distribution was reopened.
 
 To remove only the automation, without deleting the VHDX or fstab entries:
 
@@ -233,8 +255,8 @@ Unregister-ScheduledTask -TaskName 'Mount WSL Data Btrfs' -Confirm
 
 ## Troubleshooting and disk care
 
-Inside Ubuntu, inspect the mount unit and its logs in systemd's mount
-namespace:
+Inside the selected distribution, inspect the mount unit and its logs in
+systemd's mount namespace:
 
 ```bash
 sudo nsenter --mount=/proc/1/ns/mnt -- findmnt --mountpoint /mnt/data
@@ -252,6 +274,10 @@ For a different mount point, get the unit name with
   reformat the disk to fix a UUID mismatch.
 - **A different filesystem is already mounted:** investigate with `findmnt`;
   the script deliberately refuses to replace it.
+- **Subvolume mismatch:** compare fstab's `subvolid=` or `subvol=` with
+  `findmnt --mountpoint /mnt/data -o UUID,FSROOT,OPTIONS`. Stop consumers and
+  correct the mount explicitly; sharing a UUID does not make two Btrfs
+  subvolumes interchangeable.
 - **Bind mount failed:** confirm its source directory exists on the mounted
   data disk and its fstab dependency is present, reload units, and rerun the
   mount script.
@@ -261,7 +287,7 @@ For a different mount point, get the unit name with
   account owning the distribution.
 
 Before detaching, stop processes using the disk, unmount dependent bind
-mounts first, and stop the data mount inside Ubuntu:
+mounts first, and stop the data mount inside the selected distribution:
 
 ```bash
 sudo systemctl stop mnt-data.mount
@@ -281,3 +307,14 @@ does not necessarily shrink the Windows file automatically.
 
 See Microsoft's [WSL disk mounting reference](https://learn.microsoft.com/en-us/windows/wsl/wsl2-mount-disk)
 for WSL requirements and attachment behavior.
+
+## Local checks
+
+```bash
+./test-btrfs.sh
+```
+
+These isolated checks use mocked filesystem, mount, and scheduled-task commands.
+They cover mount identity, subvolume selection, dependent mounts, and exact
+startup argument forwarding without formatting disks, mounting devices, or
+registering a real task. Bash and PowerShell 7 are required.

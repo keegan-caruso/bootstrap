@@ -136,14 +136,16 @@ mounts. It does not create or format the disk or change fstab.
 Run from elevated Windows PowerShell:
 
 ```powershell
-.\Mount-DataBtrfs.ps1
-.\Mount-DataBtrfs.ps1 -WhatIf
+.\Mount-DataBtrfs.ps1 -Distribution Ubuntu-26.04
+.\Mount-DataBtrfs.ps1 -Distribution Ubuntu-26.04 -WhatIf
 .\Mount-DataBtrfs.ps1 -VhdPath "Q:\data-btrfs.vhdx" `
     -Distribution Ubuntu-26.04 -MountPoint /mnt/data
 ```
 
-Defaults are `data-btrfs.vhdx` beside the script, `Ubuntu-26.04`, and
-`/mnt/data`. See [Btrfs data VHDX for WSL](wsl-btrfs.md) for prerequisites,
+Defaults are `data-btrfs.vhdx` beside the script and `/mnt/data`;
+`-Distribution` must be supplied explicitly. Existing mounts must match both
+the fstab UUID and intended Btrfs subvolume.
+See [Btrfs data VHDX for WSL](wsl-btrfs.md) for prerequisites,
 disk creation, fstab setup, and restart behavior.
 
 ## `Register-DataBtrfsStartup.ps1`
@@ -154,14 +156,24 @@ Run once from elevated PowerShell 7 on Windows as the user owning the WSL
 distribution:
 
 ```powershell
-.\Register-DataBtrfsStartup.ps1 -WhatIf
-.\Register-DataBtrfsStartup.ps1
+.\Register-DataBtrfsStartup.ps1 -Distribution Ubuntu-26.04 `
+    -VhdPath "Q:\data-btrfs.vhdx" -MountPoint /mnt/data -WhatIf
+.\Register-DataBtrfsStartup.ps1 -Distribution Ubuntu-26.04 `
+    -VhdPath "Q:\data-btrfs.vhdx" -MountPoint /mnt/data
 ```
 
+The task retains the selected VHD path, distribution, and mount point;
+no machine-specific script edits are needed.
 `-UserId` overrides the Windows user SID; by default it uses the current
-user. The task uses the mount script's defaults and does not run on later
+user. The task does not run on later
 WSL restarts. See the [setup guide](wsl-btrfs.md#mount-automatically-at-windows-sign-in)
 before registering or customizing it.
+
+## `test-btrfs.sh`
+
+Runs isolated mount/subvolume and scheduled-argument checks using mocked
+commands. Requires Bash and PowerShell 7; no disks are formatted or mounted
+and no scheduled tasks are registered.
 
 ## `nix-wt`
 
