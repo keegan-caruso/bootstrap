@@ -108,6 +108,11 @@ SH
 printf 'git %s\n' "$*" >>"$PROFILE_COMMAND_LOG"
 exit 99
 SH
+  cat >"$fixture/bin/wsl2-ssh-agent" <<'SH'
+#!/bin/sh
+printf 'wsl2-ssh-agent\n' >>"$PROFILE_COMMAND_LOG"
+printf 'export SSH_AUTH_SOCK="$HOME/.ssh/wsl2-ssh-agent.sock";\n'
+SH
   printf '#!/bin/sh\nexit 0\n' >"$fixture/bin/fnm"
   cp "$fixture/bin/fnm" "$fixture/bin/gh"
   chmod +x "$fixture/bin/"*
@@ -220,7 +225,45 @@ test_runtime_profiles() {
     ' profile-runtime "$fixture"
 }
 
+test_wsl_ssh_agent() {
+  local fixture="${TEST_ROOT}/runtime"
+  local zsh_command
+  zsh_command="$(command -v zsh)"
+
+  # shellcheck disable=SC2016
+  env -u WSL_DISTRO_NAME -u WSL_INTEROP -u SSH_AUTH_SOCK \
+    HOME="$fixture/home" \
+    PATH="$fixture/bin:/usr/bin:/bin" \
+    PROFILE_COMMAND_LOG="$fixture/agent-commands" \
+    "$zsh_command" -df -c '
+      check() { "$@" || { print -u2 -- "SSH agent assertion failed: $*"; exit 1; }; }
+      : >"$PROFILE_COMMAND_LOG"
+      source "$1"
+      check test -z "${SSH_AUTH_SOCK:-}"
+      check test "$(grep -c "^wsl2-ssh-agent$" "$PROFILE_COMMAND_LOG")" = 0
+
+      export WSL_DISTRO_NAME=Ubuntu
+      source "$1"
+      check test "$SSH_AUTH_SOCK" = "$HOME/.ssh/wsl2-ssh-agent.sock"
+      check test "$(grep -c "^wsl2-ssh-agent$" "$PROFILE_COMMAND_LOG")" = 1
+      source "$1"
+      check test "$(grep -c "^wsl2-ssh-agent$" "$PROFILE_COMMAND_LOG")" = 1
+
+      export SSH_AUTH_SOCK=/tmp/forwarded-agent.sock
+      source "$1"
+      check test "$SSH_AUTH_SOCK" = /tmp/forwarded-agent.sock
+      check test "$(grep -c "^wsl2-ssh-agent$" "$PROFILE_COMMAND_LOG")" = 1
+
+      unset WSL_DISTRO_NAME SSH_AUTH_SOCK
+      export WSL_INTEROP=/run/WSL/test_interop
+      source "$1"
+      check test "$SSH_AUTH_SOCK" = "$HOME/.ssh/wsl2-ssh-agent.sock"
+      check test "$(grep -c "^wsl2-ssh-agent$" "$PROFILE_COMMAND_LOG")" = 2
+    ' ssh-agent-runtime "$REPO_DIR/nix/templates/zsh/shell-tools.sh"
+}
+
 test_profile_selection
 prepare_runtime_fixture
 test_runtime_profiles
+test_wsl_ssh_agent
 printf 'Shell profile checks passed\n'

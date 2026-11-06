@@ -57,9 +57,9 @@ run. npm owns the tools that are distributed natively through npm:
 
 - `@microsoft/artifacts-npm-credprovider@1.2.1`
 - `typescript@7.0.2`
-- `markdownlint-cli2@0.23.3`
-- `oxfmt@0.73.0`
-- `oxlint@1.88.0`
+- `markdownlint-cli2@0.24.0`
+- `oxfmt@0.77.0`
+- `oxlint@1.92.0`
 
 The Artifacts npm credential provider is installed from Microsoft's public
 Azure Artifacts feed. Other npm tools continue to use the registry resolved
@@ -197,6 +197,11 @@ BOOTSTRAP_WINDOWS_GCM_PATH='/mnt/c/path/to/git-credential-manager.exe' ./bootstr
 WSL also installs the verified Linux AzureAuth release under
 `~/.local/share/azureauth`, with a link at `~/.local/bin/azureauth`, for tools that
 use AzureAuth independently of Git.
+
+The WSL Nix tools include `wsl2-ssh-agent`. Managed Zsh startup connects to the
+Windows OpenSSH Authentication Agent when `SSH_AUTH_SOCK` is unset, preserving
+existing or forwarded agents. The Windows service must be running with your keys
+loaded, and WSL PowerShell interoperability must be available.
 
 ## Updating
 

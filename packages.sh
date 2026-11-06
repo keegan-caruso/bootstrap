@@ -11,8 +11,8 @@ MICROSOFT_NPM_GLOBAL_PACKAGES=(
 )
 
 NPM_GLOBAL_PACKAGES=(
-  markdownlint-cli2@0.23.3
-  oxfmt@0.73.0
-  oxlint@1.88.0
+  markdownlint-cli2@0.24.0
+  oxfmt@0.77.0
+  oxlint@1.92.0
   typescript@7.0.2
 )

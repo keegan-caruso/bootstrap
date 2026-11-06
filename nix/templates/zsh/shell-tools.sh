@@ -1,3 +1,9 @@
+if [[ -n "${WSL_DISTRO_NAME:-}" || -n "${WSL_INTEROP:-}" ]] &&
+   [[ -z "${SSH_AUTH_SOCK:-}" ]] &&
+   command -v wsl2-ssh-agent >/dev/null 2>&1; then
+  eval "$(wsl2-ssh-agent)"
+fi
+
 # fnm
 _fnm_binary="$(command -v fnm 2>/dev/null)"
 if [[ -n "$_fnm_binary" ]]; then

@@ -134,6 +134,7 @@ env -u FNM_MULTISHELL_PATH -u FNM_DIR \
     ilspy --version
     ilspycmd --version
     az version --output json
+    az network bastion --help >/dev/null
     terraform version
   '
 

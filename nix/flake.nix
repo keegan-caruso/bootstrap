@@ -181,6 +181,7 @@
           );
           azureCli = azureCliPkgs.azure-cli.withExtensions [
             azureCliPkgs.azure-cli-extensions.azure-devops
+            azureCliPkgs.azure-cli-extensions.bastion
             azureCliPkgs.azure-cli-extensions.log-analytics
           ];
           psScriptAnalyzer = pkgs.fetchzip {
@@ -269,6 +270,7 @@
               wl-clipboard
             ];
           wslTools = lib.optionals pkgs.stdenv.hostPlatform.isLinux [
+            pkgs.wsl2-ssh-agent
             wslview
           ];
           fonts = with pkgs; [
